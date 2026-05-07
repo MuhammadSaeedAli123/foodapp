@@ -1,0 +1,14 @@
+# Backend
+FoodDelivery.API/bin/
+FoodDelivery.API/obj/
+FoodDelivery.API/appsettings.Production.json
+
+# Frontend
+food-delivery-client/node_modules/
+food-delivery-client/dist/
+food-delivery-client/.env
+food-delivery-client/.env.local
+
+# OS
+.DS_Store
+Thumbs.db
