@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using FoodDelivery.API.Core.Entities;
+using FoodDelivery.API.Core.Interfaces;
 using FoodDelivery.API.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,9 +11,14 @@ namespace FoodDelivery.API.Controllers;
 [Route("api/[controller]")]
 public class ReviewsController : BaseController
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext                _db;
+    private readonly IOrderNotificationService   _notifier;
 
-    public ReviewsController(AppDbContext db) => _db = db;
+    public ReviewsController(AppDbContext db, IOrderNotificationService notifier)
+    {
+        _db       = db;
+        _notifier = notifier;
+    }
 
     /// <summary>GET /api/reviews/restaurant/{id} — public: all reviews for a restaurant</summary>
     [HttpGet("restaurant/{restaurantId:guid}")]
@@ -126,6 +132,9 @@ public class ReviewsController : BaseController
         _db.Reviews.Add(review);
         await _db.SaveChangesAsync();
         await RecalcRatingAsync(order.RestaurantId);
+
+        var reviewer = await _db.Users.FindAsync(CurrentUserId);
+        await _notifier.NotifyNewReviewAsync(order.RestaurantId, reviewer?.FullName ?? "A customer", dto.Rating);
 
         return StatusCode(201, new { review.Id, review.Rating, review.Comment, review.CreatedAt });
     }

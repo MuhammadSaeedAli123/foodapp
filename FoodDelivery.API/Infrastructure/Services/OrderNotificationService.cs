@@ -148,6 +148,20 @@ public class OrderNotificationService : IOrderNotificationService
             .SendAsync("OrderAssigned", new { orderId, assignedRiderId });
     }
 
+    // ── Review notification ───────────────────────────────────────────────────
+
+    public async Task NotifyNewReviewAsync(Guid restaurantId, string reviewerName, int rating)
+    {
+        await _hub.Clients.Group($"owner-{restaurantId}")
+            .SendAsync("NewReviewReceived", new
+            {
+                restaurantId,
+                reviewerName,
+                rating,
+                time = DateTime.UtcNow,
+            });
+    }
+
     // ── Restaurant owner ──────────────────────────────────────────────────────
 
     public async Task NotifyOwnerNewOrderAsync(OrderDto order)

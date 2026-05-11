@@ -55,6 +55,7 @@ public class UsersController : BaseController
         {
             user.Id, user.FullName, user.Email, user.PhoneNumber,
             user.Address, user.Role, user.Cnic, user.CreatedAt,
+            user.ProfilePhotoUrl,
             RestaurantId   = restaurantId,
             RestaurantName = restaurantName
         });
@@ -66,12 +67,44 @@ public class UsersController : BaseController
         var user = await _db.Users.FindAsync(CurrentUserId);
         if (user == null) return NotFound();
 
-        user.FullName = dto.FullName;
+        user.FullName    = dto.FullName;
         user.PhoneNumber = dto.PhoneNumber;
-        user.Address = dto.Address;
+        user.Address     = dto.Address;
 
         await _db.SaveChangesAsync();
         return Ok(new { user.Id, user.FullName, user.Email, user.PhoneNumber, user.Address, user.Role });
+    }
+
+    [HttpPatch("me/photo")]
+    [Authorize(Roles = "User,Rider,RestaurantOwner")]
+    public async Task<IActionResult> UploadMyPhoto(IFormFile? file)
+    {
+        var user = await _db.Users.FindAsync(CurrentUserId);
+        if (user == null) return NotFound();
+
+        var url = await SaveImageAsync(file, "profiles", CurrentUserId.ToString());
+        if (url.StartsWith("ERR:")) return BadRequest(new { message = url[4..] });
+
+        if (!string.IsNullOrEmpty(user.ProfilePhotoUrl)) DeleteFile(user.ProfilePhotoUrl);
+
+        user.ProfilePhotoUrl = url;
+        await _db.SaveChangesAsync();
+        return Ok(new { user.Id, user.ProfilePhotoUrl });
+    }
+
+    [HttpPut("me/password")]
+    [Authorize(Roles = "User,Rider,RestaurantOwner")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var user = await _db.Users.FindAsync(CurrentUserId);
+        if (user == null) return NotFound();
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Password updated successfully." });
     }
 
     // ── Admin: all users ─────────────────────────────────────────────────────
@@ -804,6 +837,13 @@ public class UpdateProfileDto
     public string FullName    { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public string Address     { get; set; } = string.Empty;
+}
+
+public class ChangePasswordDto
+{
+    [Required, MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
+    [MaxLength(100)]
+    public string NewPassword { get; set; } = string.Empty;
 }
 
 public class CreateWorkerDto

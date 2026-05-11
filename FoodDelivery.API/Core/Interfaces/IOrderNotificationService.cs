@@ -27,4 +27,7 @@ public interface IOrderNotificationService
 
     /// <summary>Tells all riders the given order has been taken so they remove it from their UI.</summary>
     Task NotifyOrderAssignedAsync(Guid orderId, Guid assignedRiderId);
+
+    /// <summary>Notifies the restaurant owner when a customer submits a new review.</summary>
+    Task NotifyNewReviewAsync(Guid restaurantId, string reviewerName, int rating);
 }

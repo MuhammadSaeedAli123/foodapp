@@ -53,6 +53,7 @@ export default function OwnerLayout({ children, title }) {
     conn.on('OwnerNewOrder', (order) => {
       const notif = {
         id:           order.id + '-' + Date.now(),
+        type:         'order',
         orderId:      order.id,
         customerName: order.customerName,
         totalAmount:  order.totalAmount,
@@ -61,7 +62,23 @@ export default function OwnerLayout({ children, title }) {
         read:         false,
       }
       setNotifications(prev => [notif, ...prev].slice(0, 50))
-      showPopup(order)
+      showPopup({ type: 'order', ...order })
+    })
+
+    conn.on('NewReviewReceived', (review) => {
+      const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)
+      const notif = {
+        id:           'rev-' + Date.now(),
+        type:         'review',
+        reviewerName: review.reviewerName,
+        rating:       review.rating,
+        stars,
+        message:      `New ${review.rating}★ review from ${review.reviewerName}`,
+        time:         new Date().toISOString(),
+        read:         false,
+      }
+      setNotifications(prev => [notif, ...prev].slice(0, 50))
+      showPopup({ type: 'review', ...review, stars })
     })
 
     conn.start().catch(() => {})
@@ -94,7 +111,7 @@ export default function OwnerLayout({ children, title }) {
   const handleNotifClick = useCallback((notif) => {
     markRead(notif.id)
     setBellOpen(false)
-    navigate('/owner/orders')
+    navigate(notif.type === 'review' ? '/owner/reviews' : '/owner/orders')
   }, [markRead, navigate])
 
   // ── Outside-click handlers ──────────────────────────────────────────────
@@ -296,13 +313,17 @@ export default function OwnerLayout({ children, title }) {
                         }`}
                       >
                         <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          notif.read ? 'bg-gray-100' : 'bg-brand-100'
+                          notif.read ? 'bg-gray-100' : notif.type === 'review' ? 'bg-amber-100' : 'bg-brand-100'
                         }`}>
-                          <svg className={`w-4 h-4 ${notif.read ? 'text-gray-400' : 'text-brand-500'}`}
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
+                          {notif.type === 'review' ? (
+                            <span className={`text-sm ${notif.read ? 'text-gray-400' : 'text-amber-500'}`}>★</span>
+                          ) : (
+                            <svg className={`w-4 h-4 ${notif.read ? 'text-gray-400' : 'text-brand-500'}`}
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
@@ -312,7 +333,9 @@ export default function OwnerLayout({ children, title }) {
                             )}
                           </div>
                           <p className="text-xs text-gray-600 mt-0.5 truncate">
-                            #{notif.orderId.slice(0, 8).toUpperCase()} · {notif.customerName}
+                            {notif.type === 'review'
+                              ? notif.stars
+                              : `#${notif.orderId.slice(0, 8).toUpperCase()} · ${notif.customerName}`}
                           </p>
                           <p className="text-[11px] text-gray-400 mt-0.5">{timeAgo(notif.time)}</p>
                         </div>
@@ -358,16 +381,24 @@ export default function OwnerLayout({ children, title }) {
             <div className="p-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    popup.type === 'review' ? 'bg-amber-100' : 'bg-brand-100'
+                  }`}>
+                    {popup.type === 'review' ? (
+                      <span className="text-xl text-amber-500">★</span>
+                    ) : (
+                      <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                    )}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">New Order Received!</p>
-                    <p className="text-xs text-brand-500 font-medium">
-                      #{popup.id?.slice(0, 8).toUpperCase()}
+                    <p className="text-sm font-bold text-gray-900">
+                      {popup.type === 'review' ? 'New Review!' : 'New Order Received!'}
+                    </p>
+                    <p className={`text-xs font-medium ${popup.type === 'review' ? 'text-amber-500' : 'text-brand-500'}`}>
+                      {popup.type === 'review' ? popup.stars : `#${popup.id?.slice(0, 8).toUpperCase()}`}
                     </p>
                   </div>
                 </div>
@@ -382,24 +413,33 @@ export default function OwnerLayout({ children, title }) {
               </div>
 
               <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Customer</span>
-                  <span className="text-xs font-semibold text-gray-900">{popup.customerName}</span>
-                </div>
-                {popup.totalAmount != null && (
+                {popup.type === 'review' ? (
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Total</span>
-                    <span className="text-xs font-bold text-green-600">{formatCurrency(popup.totalAmount)}</span>
+                    <span className="text-xs text-gray-500">Reviewer</span>
+                    <span className="text-xs font-semibold text-gray-900">{popup.reviewerName}</span>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">Customer</span>
+                      <span className="text-xs font-semibold text-gray-900">{popup.customerName}</span>
+                    </div>
+                    {popup.totalAmount != null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Total</span>
+                        <span className="text-xs font-bold text-green-600">{formatCurrency(popup.totalAmount)}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => { dismissPopup(); navigate('/owner/orders') }}
+                  onClick={() => { dismissPopup(); navigate(popup.type === 'review' ? '/owner/reviews' : '/owner/orders') }}
                   className="flex-1 py-2 px-3 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-xl transition-colors"
                 >
-                  View Order
+                  {popup.type === 'review' ? 'View Reviews' : 'View Order'}
                 </button>
                 <button
                   onClick={dismissPopup}
