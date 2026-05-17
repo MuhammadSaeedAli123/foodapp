@@ -16,8 +16,9 @@ export const ownerApi = {
   getOrders:         (status)  => api.get(`/owner/orders${status && status !== 'All' ? `?status=${status}` : ''}`),
   updateOrderStatus: (id, status) => api.patch(`/owner/orders/${id}/status`, { status }),
 
-  // Earnings
-  getEarnings: () => api.get('/owner/earnings'),
+  // Earnings & Commission
+  getEarnings:      ()    => api.get('/owner/earnings'),
+  updateCommission: (pct) => api.patch('/owner/commission', { commissionPercentage: pct }),
 
   // Image uploads
   uploadRestaurantImage: (file) => {

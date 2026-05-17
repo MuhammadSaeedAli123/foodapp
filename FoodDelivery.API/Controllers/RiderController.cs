@@ -44,11 +44,10 @@ public class RiderController : BaseController
         // Today's stats — fetch amounts only and aggregate in C# because
         // SQLite cannot translate Sum(decimal) to SQL.
         var today = DateTime.UtcNow.Date;
-        var todayAmounts = await _db.Orders
+        var todayOrders = await _db.Orders
             .Where(o => o.RiderId == CurrentUserId &&
                         o.Status  == OrderStatus.Delivered &&
                         o.UpdatedAt >= today)
-            .Select(o => o.TotalAmount)
             .ToListAsync();
 
         // Available orders (only fetched when online) — load entities first, map in C#
@@ -76,8 +75,8 @@ public class RiderController : BaseController
             isAvailable,
             activeOrder     = activeOrder != null ? MapOrderToDto(activeOrder) : null,
             availableOrders,
-            todayDeliveries = todayAmounts.Count,
-            todayEarnings   = todayAmounts.Count > 0 ? todayAmounts.Sum() : 0m,
+            todayDeliveries = todayOrders.Count,
+            todayEarnings   = todayOrders.Sum(o => o.RiderEarnings ?? 0m),
         });
     }
 
@@ -91,6 +90,64 @@ public class RiderController : BaseController
             orders = orders.Where(o => o.Status == status);
 
         return Ok(orders);
+    }
+
+    /// <summary>GET /api/rider/earnings — rider's commission-based earnings breakdown</summary>
+    [HttpGet("earnings")]
+    public async Task<IActionResult> GetEarnings()
+    {
+        var now        = DateTime.UtcNow;
+        var todayStart = now.Date;
+        var weekStart  = now.Date.AddDays(-(int)now.DayOfWeek);
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var delivered = await _db.Orders
+            .Where(o => o.RiderId == CurrentUserId && o.Status == OrderStatus.Delivered)
+            .ToListAsync();
+
+        // Use RiderEarnings when present (commission system); fall back to 0 for legacy orders
+        decimal Earn(Order o) => o.RiderEarnings ?? 0m;
+
+        var daily   = delivered.Where(o => o.UpdatedAt.Date >= todayStart).Sum(Earn);
+        var weekly  = delivered.Where(o => o.UpdatedAt.Date >= weekStart).Sum(Earn);
+        var monthly = delivered.Where(o => o.UpdatedAt.Date >= monthStart).Sum(Earn);
+        var total   = delivered.Sum(Earn);
+        var count   = delivered.Count;
+        var avg     = count > 0 ? Math.Round(total / count, 2) : 0m;
+
+        var last7 = Enumerable.Range(0, 7)
+            .Select(i => now.Date.AddDays(-i))
+            .Select(day => new
+            {
+                Date     = day.ToString("MMM d"),
+                Earnings = delivered.Where(o => o.UpdatedAt.Date == day).Sum(Earn),
+                Orders   = delivered.Count(o => o.UpdatedAt.Date == day)
+            })
+            .Reverse()
+            .ToList();
+
+        var last30 = Enumerable.Range(0, 30)
+            .Select(i => now.Date.AddDays(-i))
+            .Select(day => new
+            {
+                Date     = day.ToString("MMM d"),
+                Earnings = delivered.Where(o => o.UpdatedAt.Date == day).Sum(Earn),
+                Orders   = delivered.Count(o => o.UpdatedAt.Date == day)
+            })
+            .Reverse()
+            .ToList();
+
+        return Ok(new
+        {
+            Daily       = daily,
+            Weekly      = weekly,
+            Monthly     = monthly,
+            Total       = total,
+            TotalOrders = count,
+            AvgPerOrder = avg,
+            Last7Days   = last7,
+            Last30Days  = last30,
+        });
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

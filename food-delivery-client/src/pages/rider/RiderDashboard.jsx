@@ -354,7 +354,7 @@ export default function RiderDashboard() {
       </div>
 
       {/* ── Stats bar ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <KpiCard
           label="Today's Deliveries"
           value={stats.todayDeliveries}

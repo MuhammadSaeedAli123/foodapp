@@ -105,6 +105,7 @@ builder.Services.AddScoped<IFoodItemService,          FoodItemService>();
 builder.Services.AddScoped<IOrderService,             OrderService>();
 builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
 builder.Services.AddScoped<ISearchService,            SearchService>();
+builder.Services.AddScoped<IEmailService,             EmailService>();
 
 // ── SignalR ───────────────────────────────────────────────────────────────────
 builder.Services.AddSignalR();

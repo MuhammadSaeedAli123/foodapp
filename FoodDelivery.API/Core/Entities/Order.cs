@@ -5,6 +5,9 @@ public class Order
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Status { get; set; } = OrderStatus.Pending;
     public decimal TotalAmount { get; set; }
+    public decimal? CommissionPercentage { get; set; }  // snapshot at delivery time
+    public decimal? RiderEarnings { get; set; }         // TotalAmount * Commission / 100
+    public decimal? RestaurantEarnings { get; set; }    // TotalAmount - RiderEarnings
     public string DeliveryAddress { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

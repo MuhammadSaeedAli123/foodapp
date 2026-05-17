@@ -57,12 +57,12 @@ export default function Home() {
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="bg-gradient-to-r from-brand-500 to-orange-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 md:py-24">
           <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-3 sm:mb-4">
               Hungry? <br />We've got you covered.
             </h1>
-            <p className="text-orange-100 text-lg mb-8">
+            <p className="text-orange-100 text-base sm:text-lg mb-6 sm:mb-8">
               Order from the best local restaurants and get it delivered in minutes.
             </p>
             <SearchBar placeholder="Search restaurants, dishes, or cuisines…" />
@@ -70,16 +70,17 @@ export default function Home() {
         </div>
       </section>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
         {/* ── Category pills ───────────────────────────────────────────────── */}
         {categories.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Browse by Category</h2>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+          <section className="mb-6 sm:mb-8">
+            <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Browse by Category</h2>
+            {/* Negative margin lets the scroll area extend edge-to-edge on mobile */}
+            <div className="scroll-x flex gap-2 sm:gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setActiveCategory(null)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-all shrink-0 ${
                   !activeCategory
                     ? 'bg-brand-500 text-white border-brand-500'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
@@ -91,7 +92,7 @@ export default function Home() {
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id === activeCategory ? null : cat.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-all ${
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-all shrink-0 ${
                     activeCategory === cat.id
                       ? 'bg-brand-500 text-white border-brand-500'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'

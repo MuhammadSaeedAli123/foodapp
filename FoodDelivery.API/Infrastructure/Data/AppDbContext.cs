@@ -7,14 +7,15 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<User>      Users       => Set<User>();
-    public DbSet<Category>  Categories  => Set<Category>();
-    public DbSet<Restaurant> Restaurants => Set<Restaurant>();
-    public DbSet<FoodItem>  FoodItems   => Set<FoodItem>();
-    public DbSet<Order>     Orders      => Set<Order>();
-    public DbSet<OrderItem> OrderItems  => Set<OrderItem>();
-    public DbSet<Vehicle>   Vehicles    => Set<Vehicle>();
-    public DbSet<Review>    Reviews     => Set<Review>();
+    public DbSet<User>             Users            => Set<User>();
+    public DbSet<Category>         Categories       => Set<Category>();
+    public DbSet<Restaurant>       Restaurants      => Set<Restaurant>();
+    public DbSet<FoodItem>         FoodItems        => Set<FoodItem>();
+    public DbSet<Order>            Orders           => Set<Order>();
+    public DbSet<OrderItem>        OrderItems       => Set<OrderItem>();
+    public DbSet<Vehicle>          Vehicles         => Set<Vehicle>();
+    public DbSet<Review>           Reviews          => Set<Review>();
+    public DbSet<PasswordResetOtp> PasswordResetOtps => Set<PasswordResetOtp>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,11 +76,23 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Restaurant>()
             .Property(r => r.DeliveryFee).HasPrecision(10, 2);
 
+        modelBuilder.Entity<Restaurant>()
+            .Property(r => r.CommissionPercentage).HasPrecision(5, 2);
+
         modelBuilder.Entity<FoodItem>()
             .Property(f => f.Price).HasPrecision(10, 2);
 
         modelBuilder.Entity<Order>()
             .Property(o => o.TotalAmount).HasPrecision(10, 2);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.CommissionPercentage).HasPrecision(5, 2);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.RiderEarnings).HasPrecision(10, 2);
+
+        modelBuilder.Entity<Order>()
+            .Property(o => o.RestaurantEarnings).HasPrecision(10, 2);
 
         modelBuilder.Entity<OrderItem>()
             .Property(oi => oi.UnitPrice).HasPrecision(10, 2);
@@ -120,6 +133,22 @@ public class AppDbContext : DbContext
             new() { Id = Guid.Parse("55555555-5555-5555-5555-555555555555"), Name = "Chinese", ImageUrl = "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=100" },
         };
         modelBuilder.Entity<Category>().HasData(categories);
+
+        // PasswordResetOtp → User
+        modelBuilder.Entity<PasswordResetOtp>()
+            .HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // One active OTP per user at a time — index for fast lookup
+        modelBuilder.Entity<PasswordResetOtp>()
+            .HasIndex(p => p.UserId);
+
+        modelBuilder.Entity<PasswordResetOtp>()
+            .HasIndex(p => p.ResetToken)
+            .IsUnique()
+            .HasFilter("\"ResetToken\" IS NOT NULL");
 
         // Seed admin user (password: Admin@123)
         // NOTE: hash must be a compile-time constant — calling BCrypt.HashPassword() here

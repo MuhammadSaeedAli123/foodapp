@@ -14,6 +14,7 @@ public static class DataSeeder
         await SeedBurgerHutStaffAsync(db);
         await SeedWorkersAsync(db);
         await SeedReviewsAsync(db);
+        await SeedReviewTestCustomersAsync(db);   // 3 fresh accounts ready to trigger review notification
     }
 
     private static async Task SeedRestaurantsAsync(AppDbContext db)
@@ -279,7 +280,8 @@ public static class DataSeeder
 
     private static async Task SeedFurqanAsync(AppDbContext db)
     {
-        // ── 1. Ensure furqan account exists ───────────────────────────────────
+        // ── 1. Ensure furqan account exists with the correct password ─────────
+        const string furqanPassword = "Owner@123";
         var furqan = await db.Users.FirstOrDefaultAsync(u => u.Email == "furqan@gmail.com");
         if (furqan == null)
         {
@@ -288,7 +290,7 @@ public static class DataSeeder
                 Id           = Guid.Parse("f0000000-0000-0000-0000-000000000001"),
                 FullName     = "Furqan Ahmed",
                 Email        = "furqan@gmail.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Owner@123"),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(furqanPassword),
                 PhoneNumber  = "+923001234567",
                 Address      = "5 Biryani Street, North Quarter",
                 Role         = "RestaurantOwner",
@@ -296,6 +298,12 @@ public static class DataSeeder
                 CreatedAt    = new DateTime(2024, 1, 5, 0, 0, 0, DateTimeKind.Utc),
             };
             db.Users.Add(furqan);
+            await db.SaveChangesAsync();
+        }
+        else if (!BCrypt.Net.BCrypt.Verify(furqanPassword, furqan.PasswordHash))
+        {
+            // Password drifted (e.g. manual SQL edit) — reset to seeder default
+            furqan.PasswordHash = BCrypt.Net.BCrypt.HashPassword(furqanPassword);
             await db.SaveChangesAsync();
         }
 
@@ -722,6 +730,100 @@ public static class DataSeeder
         await db.SaveChangesAsync();
 
         restaurant.Rating = Math.Round((decimal)reviews.Average(r => r.Rating), 1);
+        await db.SaveChangesAsync();
+    }
+
+    // ── 3 test customers — each has exactly one delivered (un-reviewed) order
+    //    at Karachi Kitchen so you can log in, submit a review, and watch the
+    //    owner get a real-time SignalR notification.
+    private static async Task SeedReviewTestCustomersAsync(AppDbContext db)
+    {
+        const string testPassword = "Test@123";
+
+        var defs = new[]
+        {
+            (Id: "bb100000-0000-0000-0000-000000000001", Name: "Reviewer One",   Email: "reviewer1@test.com"),
+            (Id: "bb100000-0000-0000-0000-000000000002", Name: "Reviewer Two",   Email: "reviewer2@test.com"),
+            (Id: "bb100000-0000-0000-0000-000000000003", Name: "Reviewer Three", Email: "reviewer3@test.com"),
+        };
+
+        // Resolve furqan's restaurant (needed for orders)
+        var furqan = await db.Users.FirstOrDefaultAsync(u => u.Email == "furqan@gmail.com");
+        if (furqan == null) return;
+
+        var restaurant = await db.Restaurants.FirstOrDefaultAsync(r => r.OwnerId == furqan.Id);
+        if (restaurant == null) return;
+
+        // ── Ensure accounts exist with correct password ───────────────────────
+        var needsOrders = false;
+        var customers   = new List<User>();
+
+        foreach (var (id, name, email) in defs)
+        {
+            var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (existing == null)
+            {
+                existing = new User
+                {
+                    Id           = Guid.Parse(id),
+                    FullName     = name,
+                    Email        = email,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(testPassword),
+                    PhoneNumber  = $"+923009990{defs.ToList().FindIndex(d => d.Email == email) + 1}",
+                    Role         = "User",
+                    Address      = "Karachi, Pakistan",
+                    IsActive     = true,
+                    CreatedAt    = DateTime.UtcNow.AddDays(-10),
+                };
+                db.Users.Add(existing);
+                needsOrders = true;
+            }
+            else if (!BCrypt.Net.BCrypt.Verify(testPassword, existing.PasswordHash))
+            {
+                existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(testPassword);
+            }
+            customers.Add(existing);
+        }
+        await db.SaveChangesAsync();
+
+        if (!needsOrders) return;   // accounts existed → orders already created earlier
+
+        var foodItems = await db.FoodItems
+            .Where(f => f.RestaurantId == restaurant.Id && f.IsAvailable)
+            .ToListAsync();
+
+        if (foodItems.Count == 0) return;
+
+        // One delivered order per customer — intentionally NO review so the
+        // customer can submit one through the UI and trigger the notification.
+        var orders = customers.Select((customer, i) =>
+        {
+            var fi  = foodItems[i % foodItems.Count];
+            var qty = i + 1;    // 1, 2, 3 items
+            var oi  = new OrderItem
+            {
+                Id         = Guid.NewGuid(),
+                FoodItemId = fi.Id,
+                Quantity   = qty,
+                UnitPrice  = fi.Price,
+                SubTotal   = fi.Price * qty,
+            };
+            return new Order
+            {
+                Id              = Guid.NewGuid(),
+                Status          = OrderStatus.Delivered,
+                TotalAmount     = oi.SubTotal,
+                DeliveryAddress = "Test Address, Karachi",
+                Notes           = "",
+                UserId          = customer.Id,
+                RestaurantId    = restaurant.Id,
+                CreatedAt       = DateTime.UtcNow.AddDays(-(9 - i * 3)),
+                UpdatedAt       = DateTime.UtcNow.AddDays(-(9 - i * 3)).AddHours(1),
+                OrderItems      = new List<OrderItem> { oi },
+            };
+        }).ToList();
+
+        db.Orders.AddRange(orders);
         await db.SaveChangesAsync();
     }
 

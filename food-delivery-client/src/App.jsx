@@ -10,6 +10,7 @@ import NotFound from './pages/NotFound'
 import Home              from './pages/Home'
 import Login             from './pages/Login'
 import Register          from './pages/Register'
+import ForgotPassword    from './pages/ForgotPassword'
 import RestaurantDetail  from './pages/RestaurantDetail'
 import Cart              from './pages/Cart'
 import Checkout          from './pages/Checkout'
@@ -29,6 +30,7 @@ import ManageOwners         from './pages/admin/ManageOwners'
 // Rider pages
 import RiderDashboard from './pages/rider/RiderDashboard'
 import RiderOrders    from './pages/rider/RiderOrders'
+import RiderEarnings  from './pages/rider/RiderEarnings'
 
 // Worker pages
 import KitchenPanel from './pages/worker/KitchenPanel'
@@ -52,6 +54,7 @@ export default function App() {
             <Route path="/"                   element={<Home />} />
             <Route path="/login"              element={<Login />} />
             <Route path="/register"           element={<Register />} />
+            <Route path="/forgot-password"    element={<ForgotPassword />} />
             <Route path="/restaurants/:id"    element={<RestaurantDetail />} />
 
             {/* User */}
@@ -127,6 +130,11 @@ export default function App() {
             <Route path="/rider/orders" element={
               <ProtectedRoute roles={['Rider']}>
                 <RiderOrders />
+              </ProtectedRoute>
+            } />
+            <Route path="/rider/earnings" element={
+              <ProtectedRoute roles={['Rider']}>
+                <RiderEarnings />
               </ProtectedRoute>
             } />
 

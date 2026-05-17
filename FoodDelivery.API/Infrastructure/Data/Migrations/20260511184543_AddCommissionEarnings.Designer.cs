@@ -3,6 +3,7 @@ using System;
 using FoodDelivery.API.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FoodDelivery.API.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260511184543_AddCommissionEarnings")]
+    partial class AddCommissionEarnings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -196,51 +199,6 @@ namespace FoodDelivery.API.Infrastructure.Data.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("OrderItems");
-                });
-
-            modelBuilder.Entity("FoodDelivery.API.Core.Entities.PasswordResetOtp", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsUsed")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsVerified")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("OtpHash")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ResetToken")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ResetTokenExpiresAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ResetToken")
-                        .IsUnique()
-                        .HasFilter("\"ResetToken\" IS NOT NULL");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("PasswordResetOtps");
                 });
 
             modelBuilder.Entity("FoodDelivery.API.Core.Entities.Restaurant", b =>
@@ -518,17 +476,6 @@ namespace FoodDelivery.API.Infrastructure.Data.Migrations
                     b.Navigation("FoodItem");
 
                     b.Navigation("Order");
-                });
-
-            modelBuilder.Entity("FoodDelivery.API.Core.Entities.PasswordResetOtp", b =>
-                {
-                    b.HasOne("FoodDelivery.API.Core.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FoodDelivery.API.Core.Entities.Restaurant", b =>

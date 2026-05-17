@@ -40,6 +40,18 @@ export default function OwnerLayout({ children, title }) {
 
   const unreadCount = notifications.filter(n => !n.read).length
 
+  // ── Popup helpers (must be defined before SignalR effect) ───────────────
+  const showPopup = useCallback((data) => {
+    clearTimeout(popupTimer.current)
+    setPopup(data)
+    popupTimer.current = setTimeout(() => setPopup(null), 7000)
+  }, [])
+
+  const dismissPopup = useCallback(() => {
+    clearTimeout(popupTimer.current)
+    setPopup(null)
+  }, [])
+
   // ── SignalR connection ──────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return
@@ -47,7 +59,7 @@ export default function OwnerLayout({ children, title }) {
     const conn = new signalR.HubConnectionBuilder()
       .withUrl('/hubs/orders', { accessTokenFactory: () => token })
       .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Warning)
+      .configureLogging(signalR.LogLevel.Information)
       .build()
 
     conn.on('OwnerNewOrder', (order) => {
@@ -66,6 +78,7 @@ export default function OwnerLayout({ children, title }) {
     })
 
     conn.on('NewReviewReceived', (review) => {
+      console.log('[SignalR] NewReviewReceived:', review)
       const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)
       const notif = {
         id:           'rev-' + Date.now(),
@@ -81,23 +94,13 @@ export default function OwnerLayout({ children, title }) {
       showPopup({ type: 'review', ...review, stars })
     })
 
-    conn.start().catch(() => {})
+    conn.start()
+      .then(() => console.log('[SignalR] Owner hub connected'))
+      .catch(err => console.error('[SignalR] Owner hub connection failed:', err))
     connRef.current = conn
 
     return () => { conn.stop() }
-  }, [token])
-
-  // ── Popup helpers ───────────────────────────────────────────────────────
-  const showPopup = useCallback((order) => {
-    clearTimeout(popupTimer.current)
-    setPopup(order)
-    popupTimer.current = setTimeout(() => setPopup(null), 7000)
-  }, [])
-
-  const dismissPopup = useCallback(() => {
-    clearTimeout(popupTimer.current)
-    setPopup(null)
-  }, [])
+  }, [token, showPopup])
 
   // ── Notification actions ────────────────────────────────────────────────
   const markRead = useCallback((id) => {
@@ -274,7 +277,7 @@ export default function OwnerLayout({ children, title }) {
 
             {/* ── Dropdown ── */}
             {bellOpen && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-[min(320px,calc(100vw-2rem))] bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                   <div className="flex items-center gap-2">
@@ -360,9 +363,9 @@ export default function OwnerLayout({ children, title }) {
           </div>
 
           {/* Live badge */}
-          <div className="flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full text-xs font-medium shrink-0">
+          <div className="flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-2 sm:px-3 py-1 rounded-full text-xs font-medium shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            Live
+            <span className="hidden sm:inline">Live</span>
           </div>
         </header>
 
@@ -371,9 +374,9 @@ export default function OwnerLayout({ children, title }) {
         </main>
       </div>
 
-      {/* ── Popup notification (bottom-right) ──────────────────────────────── */}
+      {/* ── Popup notification (bottom-right on desktop, bottom-sheet on mobile) ── */}
       {popup && (
-        <div className="fixed bottom-6 right-6 z-[60] w-80 animate-slide-up">
+        <div className="fixed bottom-0 left-0 right-0 z-[60] animate-slide-up sm:bottom-6 sm:left-auto sm:right-6 sm:w-80">
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
             {/* Accent bar */}
             <div className="h-1 bg-gradient-to-r from-brand-500 to-brand-400" />

@@ -37,7 +37,7 @@ export default function RiderOrders() {
 
   const totalEarnings = orders
     .filter(o => o.status === 'Delivered')
-    .reduce((sum, o) => sum + o.totalAmount, 0)
+    .reduce((sum, o) => sum + (o.riderEarnings ?? 0), 0)
 
   return (
     <RiderLayout title="My Orders">
@@ -62,7 +62,7 @@ export default function RiderOrders() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+      <div className="scroll-x flex gap-2 mb-4 sm:mb-6 pb-1 -mx-4 px-4 md:mx-0 md:px-0">
         {TABS.map(t => (
           <button
             key={t}
@@ -83,7 +83,8 @@ export default function RiderOrders() {
         ))}
       </div>
 
-      {/* Orders list */}
+      {/* Orders list — scrollable container */}
+      <div className="orders-scroll overflow-y-auto rounded-2xl max-h-[52vh] md:max-h-[calc(100vh-310px)]">
       {loading ? (
         <div className="flex items-center justify-center h-48">
           <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -97,7 +98,7 @@ export default function RiderOrders() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 pr-1">
           {filtered.map(order => (
             <div key={order.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-4 mb-3">
@@ -115,10 +116,35 @@ export default function RiderOrders() {
                   <p className="text-sm text-gray-500 truncate">📍 {order.deliveryAddress}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-lg font-bold text-brand-500">{formatCurrency(order.totalAmount)}</p>
+                  {order.riderEarnings != null ? (
+                    <>
+                      <p className="text-lg font-bold text-green-600">{formatCurrency(order.riderEarnings)}</p>
+                      <p className="text-xs text-gray-400">your earnings</p>
+                    </>
+                  ) : (
+                    <p className="text-lg font-bold text-brand-500">{formatCurrency(order.totalAmount)}</p>
+                  )}
                   <p className="text-xs text-gray-400 mt-1">{formatDate(order.createdAt)}</p>
                 </div>
               </div>
+
+              {/* Commission breakdown */}
+              {order.riderEarnings != null && (
+                <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-xl px-3 py-2.5 mb-3 text-xs">
+                  <div>
+                    <span className="text-gray-400 block">Order total</span>
+                    <span className="font-semibold text-gray-700">{formatCurrency(order.totalAmount)}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-gray-400 block">Commission</span>
+                    <span className="font-semibold text-brand-600">{order.commissionPercentage ?? 0}%</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-400 block">Your cut</span>
+                    <span className="font-semibold text-green-600">{formatCurrency(order.riderEarnings)}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Items */}
               <p className="text-xs text-gray-400 border-t border-gray-50 pt-3">
@@ -128,6 +154,7 @@ export default function RiderOrders() {
           ))}
         </div>
       )}
+      </div>
     </RiderLayout>
   )
 }

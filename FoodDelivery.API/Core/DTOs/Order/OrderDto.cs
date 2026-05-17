@@ -8,6 +8,9 @@ public class OrderDto
     public Guid UserId { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
+    public decimal? CommissionPercentage { get; set; }
+    public decimal? RiderEarnings { get; set; }
+    public decimal? RestaurantEarnings { get; set; }
     public string DeliveryAddress { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }

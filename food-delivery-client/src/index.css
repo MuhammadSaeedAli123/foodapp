@@ -39,8 +39,38 @@
   }
 }
 
-/* Custom scrollbar */
+/* Global smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent page-level horizontal scroll without breaking child scroll containers */
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  /* Do NOT set overflow-x: hidden on html — it breaks overflow-x: auto on child elements in iOS Safari */
+}
+
+/* Custom scrollbar — global */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+
+/* Horizontal scroll container (categories, tabs) — edge-to-edge on mobile */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+
+/* Orders list scrollable container (vertical) */
+.orders-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
+  scroll-behavior: smooth;
+}

@@ -274,6 +274,23 @@ public class OwnerController : BaseController
         return Ok(new { order.Id, order.Status, order.UpdatedAt });
     }
 
+    // ── Commission ────────────────────────────────────────────────────────────
+
+    /// <summary>PATCH /api/owner/commission — set the rider commission %</summary>
+    [HttpPatch("commission")]
+    public async Task<IActionResult> UpdateCommission([FromBody] CommissionDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var r = await _db.Restaurants.FirstOrDefaultAsync(r => r.OwnerId == CurrentUserId);
+        if (r == null) return NotFound();
+
+        r.CommissionPercentage = dto.CommissionPercentage;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { r.Id, r.CommissionPercentage });
+    }
+
     // ── Earnings ──────────────────────────────────────────────────────────────
 
     /// <summary>GET /api/owner/earnings — daily/weekly/monthly revenue breakdown</summary>
@@ -292,20 +309,30 @@ public class OwnerController : BaseController
             .Where(o => o.RestaurantId == r.Id && o.Status == OrderStatus.Delivered)
             .ToListAsync();
 
-        var daily   = delivered.Where(o => o.CreatedAt.Date >= todayStart).Sum(o => o.TotalAmount);
-        var weekly  = delivered.Where(o => o.CreatedAt.Date >= weekStart).Sum(o => o.TotalAmount);
-        var monthly = delivered.Where(o => o.CreatedAt.Date >= monthStart).Sum(o => o.TotalAmount);
-        var total   = delivered.Sum(o => o.TotalAmount);
-        var count   = delivered.Count;
-        var avg     = count > 0 ? Math.Round(total / count, 2) : 0m;
+        // Use RestaurantEarnings when available (post-commission); fall back to TotalAmount for legacy orders
+        decimal NetEarnings(Order o)    => o.RestaurantEarnings ?? o.TotalAmount;
+        decimal RiderPayout(Order o)    => o.RiderEarnings      ?? 0m;
+        decimal GrossAmount(Order o)    => o.TotalAmount;
+
+        var daily   = delivered.Where(o => o.CreatedAt.Date >= todayStart).Sum(NetEarnings);
+        var weekly  = delivered.Where(o => o.CreatedAt.Date >= weekStart).Sum(NetEarnings);
+        var monthly = delivered.Where(o => o.CreatedAt.Date >= monthStart).Sum(NetEarnings);
+        var total   = delivered.Sum(NetEarnings);
+
+        var totalGross      = delivered.Sum(GrossAmount);
+        var totalRiderPaid  = delivered.Sum(RiderPayout);
+        var count           = delivered.Count;
+        var avg             = count > 0 ? Math.Round(total / count, 2) : 0m;
 
         var last7 = Enumerable.Range(0, 7)
             .Select(i => now.Date.AddDays(-i))
             .Select(day => new
             {
-                Date    = day.ToString("MMM d"),
-                Revenue = delivered.Where(o => o.CreatedAt.Date == day).Sum(o => o.TotalAmount),
-                Orders  = delivered.Count(o => o.CreatedAt.Date == day)
+                Date            = day.ToString("MMM d"),
+                Revenue         = delivered.Where(o => o.CreatedAt.Date == day).Sum(NetEarnings),
+                RiderPayouts    = delivered.Where(o => o.CreatedAt.Date == day).Sum(RiderPayout),
+                GrossRevenue    = delivered.Where(o => o.CreatedAt.Date == day).Sum(GrossAmount),
+                Orders          = delivered.Count(o => o.CreatedAt.Date == day)
             })
             .Reverse()
             .ToList();
@@ -314,23 +341,28 @@ public class OwnerController : BaseController
             .Select(i => now.Date.AddDays(-i))
             .Select(day => new
             {
-                Date    = day.ToString("MMM d"),
-                Revenue = delivered.Where(o => o.CreatedAt.Date == day).Sum(o => o.TotalAmount),
-                Orders  = delivered.Count(o => o.CreatedAt.Date == day)
+                Date            = day.ToString("MMM d"),
+                Revenue         = delivered.Where(o => o.CreatedAt.Date == day).Sum(NetEarnings),
+                RiderPayouts    = delivered.Where(o => o.CreatedAt.Date == day).Sum(RiderPayout),
+                GrossRevenue    = delivered.Where(o => o.CreatedAt.Date == day).Sum(GrossAmount),
+                Orders          = delivered.Count(o => o.CreatedAt.Date == day)
             })
             .Reverse()
             .ToList();
 
         return Ok(new
         {
-            Daily         = daily,
-            Weekly        = weekly,
-            Monthly       = monthly,
-            Total         = total,
-            TotalOrders   = count,
-            AvgOrderValue = avg,
-            Last7Days     = last7,
-            Last30Days    = last30
+            Daily               = daily,
+            Weekly              = weekly,
+            Monthly             = monthly,
+            Total               = total,
+            TotalGross          = totalGross,
+            TotalRiderPayouts   = totalRiderPaid,
+            TotalOrders         = count,
+            AvgOrderValue       = avg,
+            CommissionPercentage = r.CommissionPercentage,
+            Last7Days           = last7,
+            Last30Days          = last30,
         });
     }
 
@@ -382,6 +414,7 @@ public class OwnerController : BaseController
         r.Id, r.Name, r.Description, r.ImageUrl,
         r.Address, r.PhoneNumber, r.Rating, r.IsOpen,
         r.OpenTime, r.CloseTime, r.DeliveryTime, r.DeliveryFee,
+        r.CommissionPercentage,
         CategoryName = r.Category!.Name, r.CategoryId
     };
 
@@ -402,19 +435,22 @@ public class OwnerController : BaseController
 
         return new OrderDto
         {
-            Id              = full.Id,
-            UserId          = full.UserId,
-            Status          = full.Status,
-            TotalAmount     = full.TotalAmount,
-            DeliveryAddress = full.DeliveryAddress,
-            Notes           = full.Notes,
-            CreatedAt       = full.CreatedAt,
-            RestaurantName  = full.Restaurant?.Name ?? string.Empty,
-            RestaurantId    = full.RestaurantId,
-            CustomerName    = full.User?.FullName  ?? string.Empty,
-            RiderName       = full.Rider?.FullName,
-            RiderId         = full.RiderId,
-            Items           = full.OrderItems.Select(oi => new OrderItemDto
+            Id                   = full.Id,
+            UserId               = full.UserId,
+            Status               = full.Status,
+            TotalAmount          = full.TotalAmount,
+            CommissionPercentage = full.CommissionPercentage,
+            RiderEarnings        = full.RiderEarnings,
+            RestaurantEarnings   = full.RestaurantEarnings,
+            DeliveryAddress      = full.DeliveryAddress,
+            Notes                = full.Notes,
+            CreatedAt            = full.CreatedAt,
+            RestaurantName       = full.Restaurant?.Name ?? string.Empty,
+            RestaurantId         = full.RestaurantId,
+            CustomerName         = full.User?.FullName  ?? string.Empty,
+            RiderName            = full.Rider?.FullName,
+            RiderId              = full.RiderId,
+            Items                = full.OrderItems.Select(oi => new OrderItemDto
             {
                 FoodItemId   = oi.FoodItemId,
                 FoodItemName = oi.FoodItem?.Name ?? string.Empty,
@@ -472,4 +508,10 @@ public class OwnerOrderStatusDto
 {
     [Required]
     public string Status { get; set; } = string.Empty;
+}
+
+public class CommissionDto
+{
+    [Required, Range(0, 100)]
+    public decimal CommissionPercentage { get; set; }
 }

@@ -11,9 +11,14 @@ namespace FoodDelivery.API.Hubs;
 // public restaurant/menu broadcasts. Auth is enforced per-method where needed.
 public class OrderHub : Hub
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext              _db;
+    private readonly ILogger<OrderHub>         _logger;
 
-    public OrderHub(AppDbContext db) => _db = db;
+    public OrderHub(AppDbContext db, ILogger<OrderHub> logger)
+    {
+        _db     = db;
+        _logger = logger;
+    }
 
     // ── Connection lifecycle ────────────────────────────────────────────────
 
@@ -21,6 +26,8 @@ public class OrderHub : Hub
     {
         var role   = Context.User?.FindFirstValue(ClaimTypes.Role);
         var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        _logger.LogInformation("SignalR connected: role={Role} userId={UserId} connectionId={ConnectionId}", role ?? "anonymous", userId ?? "none", Context.ConnectionId);
 
         if (role == "Admin")
             await Groups.AddToGroupAsync(Context.ConnectionId, "admins");
@@ -49,7 +56,15 @@ public class OrderHub : Hub
                 .FirstOrDefaultAsync();
 
             if (restaurantId != Guid.Empty)
-                await Groups.AddToGroupAsync(Context.ConnectionId, $"owner-{restaurantId}");
+            {
+                var groupName = $"owner-{restaurantId}";
+                await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+                _logger.LogInformation("Owner {UserId} joined group {GroupName}", userId, groupName);
+            }
+            else
+            {
+                _logger.LogWarning("Owner {UserId} connected but no restaurant found in DB", userId);
+            }
         }
 
         await base.OnConnectedAsync();

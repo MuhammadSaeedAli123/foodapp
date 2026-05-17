@@ -14,6 +14,7 @@ public class Restaurant
     public string? CloseTime { get; set; }  // "HH:mm" 24-h, e.g. "22:00"
     public int DeliveryTime { get; set; } = 30; // minutes
     public decimal DeliveryFee { get; set; } = 0;
+    public decimal CommissionPercentage { get; set; } = 10m; // % of order total paid to rider
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Guid  CategoryId { get; set; }

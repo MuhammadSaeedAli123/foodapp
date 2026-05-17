@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { riderApi } from '../../api/rider'
 
 const NAV = [
   {
@@ -24,6 +25,16 @@ const NAV = [
     ),
   },
   {
+    label: 'Earnings',
+    to: '/rider/earnings',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Profile',
     to: '/profile',
     icon: (
@@ -35,16 +46,28 @@ const NAV = [
   },
 ]
 
-export default function RiderLayout({ children, title, isOnline = false }) {
+export default function RiderLayout({ children, title, isOnline: isOnlineProp }) {
   const { user, logout } = useAuth()
   const location         = useLocation()
   const navigate         = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [now, setNow]                 = useState(new Date())
+  const [isOnline, setIsOnline]       = useState(isOnlineProp ?? false)
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
+  }, [])
+
+  // Sync online status from prop (Dashboard passes it directly)
+  useEffect(() => {
+    if (isOnlineProp !== undefined) setIsOnline(isOnlineProp)
+  }, [isOnlineProp])
+
+  // Fetch status on pages that don't pass the prop (Orders, Earnings, etc.)
+  useEffect(() => {
+    if (isOnlineProp !== undefined) return
+    riderApi.getStatus().then(s => setIsOnline(s.isOnline)).catch(() => {})
   }, [])
 
   const handleLogout = () => { logout(); navigate('/login') }

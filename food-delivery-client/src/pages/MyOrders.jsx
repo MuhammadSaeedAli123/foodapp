@@ -177,7 +177,7 @@ export default function MyOrders() {
 
         {/* ── Status filter tabs ──────────────────────────────────────────── */}
         {!loading && orders.length > 0 && (
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-thin">
+          <div className="scroll-x flex gap-2 mb-4 sm:mb-6 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
             {TABS.map(tab => (
               <button
                 key={tab.key}

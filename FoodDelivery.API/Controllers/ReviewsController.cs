@@ -13,11 +13,13 @@ public class ReviewsController : BaseController
 {
     private readonly AppDbContext                _db;
     private readonly IOrderNotificationService   _notifier;
+    private readonly ILogger<ReviewsController>  _logger;
 
-    public ReviewsController(AppDbContext db, IOrderNotificationService notifier)
+    public ReviewsController(AppDbContext db, IOrderNotificationService notifier, ILogger<ReviewsController> logger)
     {
         _db       = db;
         _notifier = notifier;
+        _logger   = logger;
     }
 
     /// <summary>GET /api/reviews/restaurant/{id} — public: all reviews for a restaurant</summary>
@@ -134,7 +136,17 @@ public class ReviewsController : BaseController
         await RecalcRatingAsync(order.RestaurantId);
 
         var reviewer = await _db.Users.FindAsync(CurrentUserId);
-        await _notifier.NotifyNewReviewAsync(order.RestaurantId, reviewer?.FullName ?? "A customer", dto.Rating);
+
+        _logger.LogInformation("Sending review notification for restaurant {RestaurantId} from {ReviewerName}", order.RestaurantId, reviewer?.FullName);
+        try
+        {
+            await _notifier.NotifyNewReviewAsync(order.RestaurantId, reviewer?.FullName ?? "A customer", dto.Rating);
+            _logger.LogInformation("Review notification sent successfully for restaurant {RestaurantId}", order.RestaurantId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send review notification for restaurant {RestaurantId}", order.RestaurantId);
+        }
 
         return StatusCode(201, new { review.Id, review.Rating, review.Comment, review.CreatedAt });
     }

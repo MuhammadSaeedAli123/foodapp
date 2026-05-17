@@ -176,31 +176,33 @@ export default function OwnerOrders() {
           ))}
         </div>
 
-        {/* ── Order list ───────────────────────────────────────────────── */}
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : displayed.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <p className="text-5xl mb-3">📋</p>
-            <p className="text-base font-medium text-gray-500">No {tab !== 'All' ? tab.toLowerCase() : ''} orders</p>
-            <p className="text-sm mt-1">Orders will appear here in real-time</p>
-          </div>
-        ) : (
-          <div className="space-y-2 w-full">
-            {displayed.map(order => (
-              <OrderRow
-                key={order.id}
-                order={order}
-                onSelect={() => setSelected(order)}
-                onStatus={handleStatus}
-                onCancel={handleCancel}
-                isNew={newPulse && displayed[0]?.id === order.id}
-              />
-            ))}
-          </div>
-        )}
+        {/* ── Order list — scrollable container ────────────────────────── */}
+        <div className="orders-scroll overflow-y-auto rounded-2xl max-h-[52vh] md:max-h-[calc(100vh-340px)]">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : displayed.length === 0 ? (
+            <div className="text-center py-20 text-gray-400">
+              <p className="text-5xl mb-3">📋</p>
+              <p className="text-base font-medium text-gray-500">No {tab !== 'All' ? tab.toLowerCase() : ''} orders</p>
+              <p className="text-sm mt-1">Orders will appear here in real-time</p>
+            </div>
+          ) : (
+            <div className="space-y-2 w-full pr-1">
+              {displayed.map(order => (
+                <OrderRow
+                  key={order.id}
+                  order={order}
+                  onSelect={() => setSelected(order)}
+                  onStatus={handleStatus}
+                  onCancel={handleCancel}
+                  isNew={newPulse && displayed[0]?.id === order.id}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Order detail drawer ──────────────────────────────────────────── */}
@@ -342,12 +344,12 @@ function KpiCard({ icon, label, value, color, pulse }) {
     green:  'bg-green-50  text-green-600',
   }
   return (
-    <div className="card p-4 flex items-center gap-3">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-2xl shrink-0 ${COLOR[color] ?? COLOR.blue}`}>
+    <div className="card p-3 sm:p-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-xl sm:text-2xl shrink-0 ${COLOR[color] ?? COLOR.blue}`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className={`text-xl font-bold leading-tight ${pulse ? 'text-amber-600' : 'text-gray-900'}`}>{value}</p>
+        <p className={`text-base sm:text-xl font-bold leading-tight truncate ${pulse ? 'text-amber-600' : 'text-gray-900'}`}>{value}</p>
         <p className="text-xs text-gray-500 truncate">{label}</p>
         {pulse && <p className="text-xs text-amber-500 font-medium animate-pulse">Action needed</p>}
       </div>

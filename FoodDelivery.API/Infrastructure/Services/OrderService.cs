@@ -144,11 +144,20 @@ public class OrderService : IOrderService
         var order = await _db.Orders.FindAsync(orderId);
         if (order == null) return null;
 
-        order.Status = status;
+        order.Status    = status;
         order.UpdatedAt = DateTime.UtcNow;
 
         if (riderId.HasValue)
             order.RiderId = riderId;
+
+        if (status == OrderStatus.Delivered)
+        {
+            var restaurant             = await _db.Restaurants.FindAsync(order.RestaurantId);
+            var commission             = restaurant?.CommissionPercentage ?? 0m;
+            order.CommissionPercentage = commission;
+            order.RiderEarnings        = Math.Round(order.TotalAmount * commission / 100m, 2);
+            order.RestaurantEarnings   = Math.Round(order.TotalAmount - order.RiderEarnings.Value, 2);
+        }
 
         await _db.SaveChangesAsync();
         return await GetByIdAsync(order.Id);
@@ -156,25 +165,28 @@ public class OrderService : IOrderService
 
     private static OrderDto MapToDto(Order o) => new()
     {
-        Id = o.Id,
-        UserId = o.UserId,
-        Status = o.Status,
-        TotalAmount = o.TotalAmount,
-        DeliveryAddress = o.DeliveryAddress,
-        Notes = o.Notes,
-        CreatedAt = o.CreatedAt,
-        RestaurantName = o.Restaurant?.Name ?? string.Empty,
-        RestaurantId = o.RestaurantId,
-        CustomerName = o.User?.FullName ?? string.Empty,
-        RiderName = o.Rider?.FullName,
-        RiderId = o.RiderId,
+        Id                   = o.Id,
+        UserId               = o.UserId,
+        Status               = o.Status,
+        TotalAmount          = o.TotalAmount,
+        CommissionPercentage = o.CommissionPercentage,
+        RiderEarnings        = o.RiderEarnings,
+        RestaurantEarnings   = o.RestaurantEarnings,
+        DeliveryAddress      = o.DeliveryAddress,
+        Notes                = o.Notes,
+        CreatedAt            = o.CreatedAt,
+        RestaurantName       = o.Restaurant?.Name ?? string.Empty,
+        RestaurantId         = o.RestaurantId,
+        CustomerName         = o.User?.FullName ?? string.Empty,
+        RiderName            = o.Rider?.FullName,
+        RiderId              = o.RiderId,
         Items = o.OrderItems.Select(oi => new OrderItemDto
         {
-            FoodItemId = oi.FoodItemId,
+            FoodItemId   = oi.FoodItemId,
             FoodItemName = oi.FoodItem?.Name ?? string.Empty,
-            Quantity = oi.Quantity,
-            UnitPrice = oi.UnitPrice,
-            SubTotal = oi.SubTotal
+            Quantity     = oi.Quantity,
+            UnitPrice    = oi.UnitPrice,
+            SubTotal     = oi.SubTotal
         }).ToList()
     };
 }
