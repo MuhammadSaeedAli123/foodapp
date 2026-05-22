@@ -23,24 +23,45 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
     {
-        if (await _db.Users.AnyAsync(u => u.Email == dto.Email))
+        if (await _db.Users.AnyAsync(u => u.Email == dto.Email.ToLower()))
             throw new ArgumentException("Email already registered.");
 
         // Prevent self-registering as Admin
         var role = dto.Role == "Rider" ? "Rider" : "User";
 
+        if (role == "Rider" && !string.IsNullOrWhiteSpace(dto.Cnic))
+        {
+            if (await _db.Users.AnyAsync(u => u.Cnic == dto.Cnic))
+                throw new ArgumentException("CNIC already registered.");
+        }
+
         var user = new User
         {
-            FullName = dto.FullName,
-            Email = dto.Email,
+            FullName     = dto.FullName,
+            Email        = dto.Email.ToLower(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            PhoneNumber = dto.PhoneNumber,
-            Address = dto.Address,
-            Role = role
+            PhoneNumber  = dto.PhoneNumber,
+            Address      = role == "User" ? dto.Address : string.Empty,
+            Cnic         = role == "Rider" ? dto.Cnic : string.Empty,
+            Role         = role
         };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
+
+        if (role == "Rider" && !string.IsNullOrWhiteSpace(dto.VehicleNumber))
+        {
+            _db.Vehicles.Add(new Vehicle
+            {
+                RiderId            = user.Id,
+                RegistrationNumber = dto.VehicleNumber,
+                Color              = dto.VehicleColor,
+                Model              = string.Empty,
+                Year               = DateTime.UtcNow.Year,
+                Type               = "Bike"
+            });
+            await _db.SaveChangesAsync();
+        }
 
         return BuildResponse(user);
     }

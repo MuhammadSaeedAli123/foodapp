@@ -4,14 +4,17 @@ function SkeletonBox({ className = '' }) {
 
 export function RestaurantCardSkeleton() {
   return (
-    <div className="card overflow-hidden">
-      <SkeletonBox className="h-48 rounded-none" />
-      <div className="p-4 space-y-3">
-        <SkeletonBox className="h-5 w-3/4" />
-        <SkeletonBox className="h-4 w-full" />
-        <div className="flex gap-4">
+    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col">
+      <SkeletonBox className="h-52 rounded-none" />
+      <div className="p-4 space-y-3 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <SkeletonBox className="h-5 w-3/4" />
+          <SkeletonBox className="h-5 w-10 rounded-lg" />
+        </div>
+        <SkeletonBox className="h-3 w-full" />
+        <div className="flex gap-3 pt-3 border-t border-gray-50">
           <SkeletonBox className="h-3 w-16" />
-          <SkeletonBox className="h-3 w-20" />
+          <SkeletonBox className="h-3 w-24" />
         </div>
       </div>
     </div>

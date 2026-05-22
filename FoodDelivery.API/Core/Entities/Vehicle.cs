@@ -9,5 +9,6 @@ public class Vehicle
     public string Model              { get; set; } = string.Empty;
     public int    Year               { get; set; }
     public string Type               { get; set; } = string.Empty; // Bike | Car | Scooter
+    public string Color              { get; set; } = string.Empty;
     public string? PictureUrl        { get; set; }
 }

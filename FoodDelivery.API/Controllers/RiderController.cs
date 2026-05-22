@@ -12,13 +12,47 @@ namespace FoodDelivery.API.Controllers;
 [Route("api/rider")]
 public class RiderController : BaseController
 {
-    private readonly AppDbContext    _db;
-    private readonly IOrderService   _orderService;
+    private readonly AppDbContext      _db;
+    private readonly IOrderService     _orderService;
+    private readonly IWebHostEnvironment _env;
 
-    public RiderController(AppDbContext db, IOrderService orderService)
+    public RiderController(AppDbContext db, IOrderService orderService, IWebHostEnvironment env)
     {
         _db           = db;
         _orderService = orderService;
+        _env          = env;
+    }
+
+    /// <summary>PATCH /api/rider/vehicle-image — upload vehicle photo</summary>
+    [HttpPatch("vehicle-image")]
+    public async Task<IActionResult> UploadVehicleImage(IFormFile? file)
+    {
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.RiderId == CurrentUserId);
+        if (vehicle == null) return NotFound(new { message = "No vehicle found for this rider." });
+
+        var url = await SaveImageAsync(file, "vehicles", vehicle.Id.ToString());
+        if (url.StartsWith("ERR:")) return BadRequest(new { message = url[4..] });
+
+        vehicle.PictureUrl = url;
+        await _db.SaveChangesAsync();
+        return Ok(new { pictureUrl = url });
+    }
+
+    private async Task<string> SaveImageAsync(IFormFile? file, string folder, string baseName)
+    {
+        if (file == null || file.Length == 0) return "ERR:No file provided";
+        if (file.Length > 5 * 1024 * 1024)   return "ERR:File must be under 5 MB";
+
+        var ext     = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        if (!allowed.Contains(ext)) return "ERR:Only JPEG, PNG or WebP images are allowed";
+
+        var dir = Path.Combine(_env.WebRootPath, "uploads", folder);
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"{baseName}{ext}");
+        await using var stream = System.IO.File.Create(path);
+        await file.CopyToAsync(stream);
+        return $"/uploads/{folder}/{baseName}{ext}";
     }
 
     /// <summary>

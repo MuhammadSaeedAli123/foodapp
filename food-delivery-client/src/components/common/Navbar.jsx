@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
@@ -8,6 +8,13 @@ export default function Navbar() {
   const { totalItems } = useCart()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -24,28 +31,30 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className={`sticky top-0 z-40 bg-white border-b border-gray-100 transition-shadow duration-300 ${scrolled ? 'shadow-md' : 'shadow-sm'}`}>
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">F</span>
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform duration-200">
+              <span className="text-white font-extrabold text-base">F</span>
             </div>
-            <span className="text-xl font-bold text-gray-900">
+            <span className="text-xl font-extrabold text-gray-900 tracking-tight">
               Food<span className="text-brand-500">Rush</span>
             </span>
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-sm font-medium text-gray-600 hover:text-brand-500 transition-colors">
+          <div className="hidden md:flex items-center gap-1">
+            <Link to="/"
+              className="text-sm font-medium text-gray-600 hover:text-brand-500 hover:bg-orange-50 px-3 py-2 rounded-lg transition-all duration-200">
               Restaurants
             </Link>
 
             {isAuthenticated && (
-              <Link to={dashboardLink()} className="text-sm font-medium text-gray-600 hover:text-brand-500 transition-colors">
+              <Link to={dashboardLink()}
+                className="text-sm font-medium text-gray-600 hover:text-brand-500 hover:bg-orange-50 px-3 py-2 rounded-lg transition-all duration-200">
                 {isRole('Admin')           ? 'Admin Panel'
                   : isRole('Rider')        ? 'Rider Panel'
                   : isRole('Worker')       ? 'Kitchen'
@@ -56,49 +65,51 @@ export default function Navbar() {
             )}
 
             {isRole('User') && (
-              <Link to="/cart" className="relative p-2 text-gray-600 hover:text-brand-500 transition-colors">
+              <Link to="/cart" className="relative p-2.5 text-gray-500 hover:text-brand-500 hover:bg-orange-50 rounded-lg transition-all duration-200 ml-1">
                 <CartIcon />
                 {totalItems > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-brand-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  <span className="absolute -top-0.5 -right-0.5 bg-brand-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-sm">
                     {totalItems > 9 ? '9+' : totalItems}
                   </span>
                 )}
               </Link>
             )}
 
+            <div className="w-px h-5 bg-gray-200 mx-2" />
+
             {isAuthenticated ? (
               <div className="relative group">
-                <button className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-brand-500 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
-                    <span className="text-brand-600 font-semibold text-sm">
+                <button className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-brand-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-orange-50">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-sm">
+                    <span className="text-white font-bold text-sm">
                       {user?.fullName?.[0]?.toUpperCase()}
                     </span>
                   </div>
                   <span className="hidden lg:block">{user?.fullName?.split(' ')[0]}</span>
                   <ChevronDown />
                 </button>
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-brand-500">
-                    Profile
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <Link to="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-brand-500 transition-colors">
+                    <span>👤</span> Profile
                   </Link>
                   {isRole('User') && (
-                    <Link to="/my-orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-brand-500">
-                      My Orders
+                    <Link to="/my-orders" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 hover:text-brand-500 transition-colors">
+                      <span>📦</span> My Orders
                     </Link>
                   )}
-                  <hr className="my-1 border-gray-100" />
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50">
-                    Logout
+                  <hr className="my-1.5 border-gray-100 mx-3" />
+                  <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                    <span>🚪</span> Logout
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-brand-500 transition-colors">
+              <div className="flex items-center gap-2">
+                <Link to="/login" className="text-sm font-semibold text-gray-600 hover:text-brand-500 px-3 py-2 rounded-lg transition-all hover:bg-orange-50">
                   Login
                 </Link>
-                <Link to="/register" className="btn-primary text-sm py-2 px-4">
-                  Sign Up
+                <Link to="/register" className="text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-xl shadow-md shadow-brand-500/25 transition-all hover:shadow-lg hover:shadow-brand-500/30 hover:-translate-y-0.5 active:translate-y-0">
+                  Sign Up Free
                 </Link>
               </div>
             )}

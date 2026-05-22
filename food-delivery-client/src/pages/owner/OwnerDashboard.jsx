@@ -335,25 +335,30 @@ export default function OwnerDashboard() {
             color="text-green-600 bg-green-100"
             icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
-          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-gray-50">
-            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${open ? 'bg-green-100' : 'bg-red-100'}`}>
-              <span className={`w-3 h-3 rounded-full ${open ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+          <div className="flex flex-col gap-2 p-3 sm:p-4 rounded-xl bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${open ? 'bg-green-100' : 'bg-red-100'}`}>
+                <span className={`w-3 h-3 rounded-full ${open ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+              </div>
+              {!r.openTime && !r.closeTime && (
+                <button onClick={handleToggleOpen} disabled={toggling}
+                  className={`shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-colors disabled:opacity-50 ${
+                    open ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-700 hover:bg-green-50'
+                  }`}>
+                  {toggling ? '…' : open ? 'Close' : 'Open'}
+                </button>
+              )}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm sm:text-base font-bold truncate ${open ? 'text-green-700' : 'text-red-600'}`}>{open ? 'Open' : 'Closed'}</p>
-              {r.openTime && r.closeTime
-                ? <p className="text-xs text-gray-400 truncate">{fmt12(r.openTime)} – {fmt12(r.closeTime)}</p>
-                : <p className="text-xs text-gray-500 truncate">{r.name}</p>
-              }
+            <div>
+              <p className={`text-base sm:text-lg font-bold leading-tight ${open ? 'text-green-700' : 'text-red-600'}`}>
+                {open ? 'Open' : 'Closed'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-snug">
+                {r.openTime && r.closeTime
+                  ? `${fmt12(r.openTime)} – ${fmt12(r.closeTime)}`
+                  : r.name}
+              </p>
             </div>
-            {!r.openTime && !r.closeTime && (
-              <button onClick={handleToggleOpen} disabled={toggling}
-                className={`shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-colors disabled:opacity-50 ${
-                  open ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-700 hover:bg-green-50'
-                }`}>
-                {toggling ? '…' : open ? 'Close' : 'Open'}
-              </button>
-            )}
           </div>
         </div>
 
@@ -753,8 +758,8 @@ function KpiCard({ icon, label, value, color, href, pulse }) {
         {icon}
       </div>
       <div className="min-w-0">
-        <p className={`text-base sm:text-xl font-bold leading-tight truncate ${pulse ? 'text-orange-600' : 'text-gray-900'}`}>{value}</p>
-        <p className="text-xs text-gray-500 truncate">{label}</p>
+        <p className={`text-base sm:text-xl font-bold leading-tight ${pulse ? 'text-orange-600' : 'text-gray-900'}`}>{value}</p>
+        <p className="text-xs text-gray-500 leading-snug">{label}</p>
         {pulse && <p className="text-xs text-orange-400 font-medium animate-pulse">Live</p>}
       </div>
     </div>
@@ -775,17 +780,20 @@ function ProfileField({ label, required, children }) {
 
 function LiveBadge({ label, value, color, pulse, icon }) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white border border-gray-100">
-      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
-        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-        </svg>
+    <div className="flex flex-col gap-2 p-3 sm:p-4 rounded-xl bg-white border border-gray-100">
+      <div className="flex items-center justify-between">
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+          </svg>
+        </div>
+        {pulse && <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse shrink-0" />}
       </div>
-      <div className="min-w-0">
-        <p className={`text-base sm:text-xl font-bold leading-tight truncate text-gray-900 ${pulse ? 'text-orange-600' : ''}`}>{value}</p>
-        <p className="text-xs text-gray-500 truncate">{label}</p>
+      <div>
+        <p className={`text-base sm:text-lg font-bold leading-tight ${pulse ? 'text-orange-600' : 'text-gray-900'}`}>{value}</p>
+        <p className="text-xs text-gray-500 mt-0.5 leading-snug">{label}</p>
+        {pulse && <p className="text-xs text-orange-400 font-medium animate-pulse mt-0.5">Live</p>}
       </div>
-      {pulse && <span className="ml-auto w-2 h-2 rounded-full bg-orange-400 animate-pulse shrink-0" />}
     </div>
   )
 }

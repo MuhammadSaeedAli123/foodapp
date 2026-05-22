@@ -105,16 +105,12 @@ public class OwnerController : BaseController
         if (r == null) return Ok(Array.Empty<object>());
 
         var items = await _db.FoodItems
+            .Include(f => f.Variants)
             .Where(f => f.RestaurantId == r.Id)
             .OrderBy(f => f.Name)
-            .Select(f => new
-            {
-                f.Id, f.Name, f.Description, f.Price,
-                f.ImageUrl, f.IsAvailable, f.RestaurantId, f.CreatedAt
-            })
             .ToListAsync();
 
-        return Ok(items);
+        return Ok(items.Select(MenuItemPayload).ToList());
     }
 
     /// <summary>POST /api/owner/menu — create a food item</summary>
@@ -133,8 +129,13 @@ public class OwnerController : BaseController
             Price        = dto.Price,
             ImageUrl     = dto.ImageUrl,
             IsAvailable  = dto.IsAvailable,
+            HasVariants  = dto.HasVariants,
             RestaurantId = r.Id
         };
+
+        if (dto.HasVariants)
+            foreach (var v in dto.Variants)
+                item.Variants.Add(new FoodItemVariant { Size = v.Size, Price = v.Price, IsAvailable = v.IsAvailable });
 
         _db.FoodItems.Add(item);
         await _db.SaveChangesAsync();
@@ -151,7 +152,9 @@ public class OwnerController : BaseController
         var r = await _db.Restaurants.FirstOrDefaultAsync(r => r.OwnerId == CurrentUserId);
         if (r == null) return NotFound();
 
-        var item = await _db.FoodItems.FindAsync(id);
+        var item = await _db.FoodItems
+            .Include(f => f.Variants)
+            .FirstOrDefaultAsync(f => f.Id == id);
         if (item == null || item.RestaurantId != r.Id) return NotFound();
 
         item.Name        = dto.Name;
@@ -159,10 +162,17 @@ public class OwnerController : BaseController
         item.Price       = dto.Price;
         item.ImageUrl    = dto.ImageUrl;
         item.IsAvailable = dto.IsAvailable;
+        item.HasVariants = dto.HasVariants;
+
+        // Replace variants — remove old, add new
+        _db.FoodItemVariants.RemoveRange(item.Variants);
+        item.Variants.Clear();
+        if (dto.HasVariants)
+            foreach (var v in dto.Variants)
+                item.Variants.Add(new FoodItemVariant { Size = v.Size, Price = v.Price, IsAvailable = v.IsAvailable });
 
         await _db.SaveChangesAsync();
 
-        // Broadcast availability change to all users on this restaurant's page
         await _notifier.NotifyMenuItemChangedAsync(r.Id, MenuItemPayload(item));
 
         return Ok(MenuItemPayload(item));
@@ -190,7 +200,9 @@ public class OwnerController : BaseController
         var r = await _db.Restaurants.FirstOrDefaultAsync(r => r.OwnerId == CurrentUserId);
         if (r == null) return NotFound();
 
-        var item = await _db.FoodItems.FindAsync(id);
+        var item = await _db.FoodItems
+            .Include(f => f.Variants)
+            .FirstOrDefaultAsync(f => f.Id == id);
         if (item == null || item.RestaurantId != r.Id) return NotFound();
 
         var url = await SaveImageAsync(file, "menu", id.ToString());
@@ -421,7 +433,12 @@ public class OwnerController : BaseController
     private static object MenuItemPayload(FoodItem f) => new
     {
         f.Id, f.Name, f.Description, f.Price,
-        f.ImageUrl, f.IsAvailable, f.RestaurantId, f.CreatedAt
+        f.ImageUrl, f.IsAvailable, f.RestaurantId, f.CreatedAt,
+        f.HasVariants,
+        Variants = f.Variants
+            .OrderBy(v => v.Size)
+            .Select(v => new { v.Size, v.Price, v.IsAvailable })
+            .ToList()
     };
 
     private async Task<OrderDto> BuildOrderDtoAsync(Order order)
@@ -500,6 +517,21 @@ public class OwnerMenuItemDto
     public decimal Price { get; set; }
 
     public string ImageUrl { get; set; } = string.Empty;
+
+    public bool IsAvailable { get; set; } = true;
+
+    public bool HasVariants { get; set; } = false;
+
+    public List<OwnerVariantDto> Variants { get; set; } = new();
+}
+
+public class OwnerVariantDto
+{
+    [Required, MaxLength(20)]
+    public string Size { get; set; } = string.Empty;
+
+    [Required, Range(0.01, 10000)]
+    public decimal Price { get; set; }
 
     public bool IsAvailable { get; set; } = true;
 }

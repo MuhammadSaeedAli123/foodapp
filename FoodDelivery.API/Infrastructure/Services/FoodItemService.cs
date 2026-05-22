@@ -3,6 +3,7 @@ using FoodDelivery.API.Core.Entities;
 using FoodDelivery.API.Core.Interfaces;
 using FoodDelivery.API.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace FoodDelivery.API.Infrastructure.Services;
 
@@ -14,15 +15,18 @@ public class FoodItemService : IFoodItemService
 
     public async Task<IEnumerable<FoodItemDto>> GetByRestaurantAsync(Guid restaurantId)
     {
-        return await _db.FoodItems
+        var items = await _db.FoodItems
+            .Include(f => f.Variants)
             .Where(f => f.RestaurantId == restaurantId)
-            .Select(f => MapToDto(f))
             .ToListAsync();
+        return items.Select(MapToDto);
     }
 
     public async Task<FoodItemDto?> GetByIdAsync(Guid id)
     {
-        var item = await _db.FoodItems.FindAsync(id);
+        var item = await _db.FoodItems
+            .Include(f => f.Variants)
+            .FirstOrDefaultAsync(f => f.Id == id);
         return item == null ? null : MapToDto(item);
     }
 
@@ -70,12 +74,17 @@ public class FoodItemService : IFoodItemService
 
     private static FoodItemDto MapToDto(FoodItem f) => new()
     {
-        Id = f.Id,
-        Name = f.Name,
-        Description = f.Description,
-        Price = f.Price,
-        ImageUrl = f.ImageUrl,
-        IsAvailable = f.IsAvailable,
-        RestaurantId = f.RestaurantId
+        Id           = f.Id,
+        Name         = f.Name,
+        Description  = f.Description,
+        Price        = f.Price,
+        ImageUrl     = f.ImageUrl,
+        IsAvailable  = f.IsAvailable,
+        RestaurantId = f.RestaurantId,
+        HasVariants  = f.HasVariants,
+        Variants     = f.Variants
+            .OrderBy(v => v.Size)
+            .Select(v => new FoodItemVariantDto { Size = v.Size, Price = v.Price, IsAvailable = v.IsAvailable })
+            .ToList()
     };
 }

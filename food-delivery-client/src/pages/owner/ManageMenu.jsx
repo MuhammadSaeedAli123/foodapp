@@ -4,7 +4,12 @@ import { ownerApi } from '../../api/owner'
 import { formatCurrency } from '../../utils/formatters'
 import { toast } from '../../components/common/Toast'
 
-const EMPTY = { name: '', description: '', price: '', imageUrl: '', isAvailable: true }
+const SIZES   = ['Small', 'Medium', 'Large']
+const EMPTY   = {
+  name: '', description: '', price: '', imageUrl: '', isAvailable: true,
+  hasVariants: false,
+  variants: SIZES.map(s => ({ size: s, price: '', isAvailable: true, enabled: false })),
+}
 const FILTERS = ['All', 'Available', 'Out of Stock']
 const MAX_FILE_SIZE = 3 * 1024 * 1024   // 3 MB
 
@@ -170,6 +175,13 @@ export default function ManageMenu() {
       price:       String(item.price),
       imageUrl:    item.imageUrl ?? '',
       isAvailable: item.isAvailable,
+      hasVariants: item.hasVariants ?? false,
+      variants: SIZES.map(s => {
+        const existing = item.variants?.find(v => v.size === s)
+        return existing
+          ? { size: s, price: String(existing.price), isAvailable: existing.isAvailable, enabled: true }
+          : { size: s, price: '', isAvailable: true, enabled: false }
+      }),
     })
     setImageFile(null)
     setImagePreview(item.imageUrl ?? '')
@@ -181,6 +193,9 @@ export default function ManageMenu() {
     setImageFile(null)
     setImagePreview('')
   }
+
+  const updateVariant = (idx, key, value) =>
+    setForm(p => ({ ...p, variants: p.variants.map((v, i) => i === idx ? { ...v, [key]: value } : v) }))
 
   const handleFileChange = (file) => {
     if (file.size > MAX_FILE_SIZE) {
@@ -206,8 +221,15 @@ export default function ManageMenu() {
 
   const handleSave = async (e) => {
     e.preventDefault()
-    if (!form.name.trim())        return toast('Name is required', 'warning')
-    if (!form.price || parseFloat(form.price) <= 0) return toast('Enter a valid price', 'warning')
+    if (!form.name.trim()) return toast('Name is required', 'warning')
+    if (form.hasVariants) {
+      const enabled = form.variants.filter(v => v.enabled)
+      if (enabled.length === 0) return toast('Select at least one size variant', 'warning')
+      const missing = enabled.find(v => !v.price || parseFloat(v.price) <= 0)
+      if (missing) return toast(`Enter a valid price for ${missing.size}`, 'warning')
+    } else {
+      if (!form.price || parseFloat(form.price) <= 0) return toast('Enter a valid price', 'warning')
+    }
 
     setSaving(true)
     try {
@@ -224,12 +246,19 @@ export default function ManageMenu() {
         }
       }
 
+      const enabledVariants = form.variants.filter(v => v.enabled)
       const payload = {
         name:        form.name.trim(),
         description: form.description.trim(),
-        price:       parseFloat(form.price),
         imageUrl:    finalImageUrl,
         isAvailable: form.isAvailable,
+        hasVariants: form.hasVariants,
+        price: form.hasVariants
+          ? Math.min(...enabledVariants.map(v => parseFloat(v.price)))
+          : parseFloat(form.price),
+        variants: form.hasVariants
+          ? enabledVariants.map(v => ({ size: v.size, price: parseFloat(v.price), isAvailable: v.isAvailable }))
+          : [],
       }
 
       if (modal === 'add') {
@@ -461,27 +490,135 @@ export default function ManageMenu() {
                 />
               </FormField>
 
-              {/* Price */}
-              <FormField
-                label="Price"
-                required
-                error={form.price && parseFloat(form.price) <= 0 ? 'Price must be greater than 0' : null}
+              {/* ── Size Variants toggle ── */}
+              <div className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                form.hasVariants ? 'bg-brand-50 border-brand-200' : 'bg-gray-50 border-gray-200'
+              }`}
+                onClick={() => setForm(p => ({ ...p, hasVariants: !p.hasVariants }))}
               >
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm select-none">$</span>
-                  <input
-                    className={`input-field pl-8 font-semibold ${form.price && parseFloat(form.price) <= 0 ? 'border-red-300 focus:ring-red-400' : ''}`}
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max="9999"
-                    value={form.price}
-                    required
-                    placeholder="0.00"
-                    onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
-                  />
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 ${
+                    form.hasVariants ? 'bg-brand-100' : 'bg-gray-200'
+                  }`}>
+                    📏
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Size Variants</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Offer Small, Medium & Large with separate prices</p>
+                  </div>
                 </div>
-              </FormField>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0" onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" className="sr-only peer" checked={form.hasVariants}
+                    onChange={e => setForm(p => ({ ...p, hasVariants: e.target.checked }))} />
+                  <div className="w-12 h-6 bg-gray-300 rounded-full peer peer-checked:bg-brand-500
+                    after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                    after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                    peer-checked:after:translate-x-6 after:shadow-sm" />
+                </label>
+              </div>
+
+              {/* ── Variant rows (when enabled) ── */}
+              {form.hasVariants ? (
+                <div className="space-y-2.5">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-0.5">
+                    Select sizes and set prices
+                  </p>
+                  {form.variants.map((variant, idx) => (
+                    <div key={variant.size} className={`rounded-2xl border-2 transition-all ${
+                      variant.enabled ? 'border-brand-200 bg-white' : 'border-gray-100 bg-gray-50'
+                    }`}>
+                      {/* Size checkbox row */}
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          id={`size-${variant.size}`}
+                          checked={variant.enabled}
+                          onChange={e => updateVariant(idx, 'enabled', e.target.checked)}
+                          className="w-4 h-4 rounded accent-brand-500 cursor-pointer shrink-0"
+                        />
+                        <label htmlFor={`size-${variant.size}`} className={`text-sm font-semibold flex-1 cursor-pointer ${
+                          variant.enabled ? 'text-gray-900' : 'text-gray-400'
+                        }`}>
+                          {variant.size}
+                        </label>
+                        {variant.enabled && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              variant.isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
+                            }`}>
+                              {variant.isAvailable ? 'In Stock' : 'Out of Stock'}
+                            </span>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input type="checkbox" className="sr-only peer"
+                                checked={variant.isAvailable}
+                                onChange={e => updateVariant(idx, 'isAvailable', e.target.checked)} />
+                              <div className="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-green-500
+                                after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                                after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                                peer-checked:after:translate-x-4" />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Price input — only when size is checked */}
+                      {variant.enabled && (
+                        <div className="px-4 pb-3.5">
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm select-none">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              max="9999"
+                              value={variant.price}
+                              placeholder="0.00"
+                              onChange={e => updateVariant(idx, 'price', e.target.value)}
+                              className={`input-field pl-8 text-sm font-semibold ${
+                                !variant.price || parseFloat(variant.price) <= 0
+                                  ? 'border-red-300 focus:ring-red-400'
+                                  : 'border-brand-200 focus:ring-brand-400'
+                              }`}
+                            />
+                          </div>
+                          {(!variant.price || parseFloat(variant.price) <= 0) && (
+                            <p className="text-xs text-red-500 mt-1 font-medium">
+                              Price is required for {variant.size}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {form.variants.every(v => !v.enabled) && (
+                    <p className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      ⚠️ Check at least one size to continue
+                    </p>
+                  )}
+                </div>
+              ) : (
+                /* Single price field — shown only when variants are OFF */
+                <FormField
+                  label="Price"
+                  required
+                  error={form.price && parseFloat(form.price) <= 0 ? 'Price must be greater than 0' : null}
+                >
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm select-none">$</span>
+                    <input
+                      className={`input-field pl-8 font-semibold ${form.price && parseFloat(form.price) <= 0 ? 'border-red-300 focus:ring-red-400' : ''}`}
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max="9999"
+                      value={form.price}
+                      placeholder="0.00"
+                      onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
+                    />
+                  </div>
+                </FormField>
+              )}
 
               {/* Availability toggle */}
               <div className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
@@ -584,7 +721,20 @@ function MenuCard({ item, onEdit, onDelete, onToggle, confirmingDelete, onConfir
               <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.description}</p>
             )}
           </div>
-          <p className="text-brand-600 font-bold text-base shrink-0">{formatCurrency(item.price)}</p>
+          {item.hasVariants && item.variants?.length > 0 ? (
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {item.variants.map(v => (
+                <span key={v.size} className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  v.isAvailable ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-400 line-through'
+                }`}>
+                  <span className="opacity-70">{v.size[0]}</span>
+                  {formatCurrency(v.price)}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-brand-600 font-bold text-base shrink-0">{formatCurrency(item.price)}</p>
+          )}
         </div>
 
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">

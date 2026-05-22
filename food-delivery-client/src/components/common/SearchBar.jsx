@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { searchApi } from '../../api/search'
 import { formatCurrency } from '../../utils/formatters'
@@ -36,7 +36,7 @@ export default function SearchBar({ placeholder = 'Search restaurants, dishes, o
   const [loading, setLoading] = useState(false)
   const [open, setOpen]       = useState(false)
 
-  const debouncedQuery = useDebounce(query, 350)
+  const debouncedQuery = useDebounce(query, 200)
   const containerRef   = useRef(null)
   const inputRef       = useRef(null)
   const abortRef       = useRef(null)
@@ -109,10 +109,25 @@ export default function SearchBar({ placeholder = 'Search restaurants, dishes, o
     navigate(`/restaurants/${restaurantId}`)
   }
 
-  const hasRestaurants = results?.restaurants?.length > 0
-  const hasFoodItems   = results?.foodItems?.length > 0
+  // Client-side filter on every keystroke so suggestions track typing instantly
+  const displayed = useMemo(() => {
+    if (!results) return null
+    const q = query.trim().toLowerCase()
+    if (!q) return results
+    return {
+      restaurants: results.restaurants.filter(r =>
+        r.name?.toLowerCase().includes(q) || r.categoryName?.toLowerCase().includes(q)
+      ),
+      foodItems: results.foodItems.filter(item =>
+        item.name?.toLowerCase().includes(q) || item.restaurantName?.toLowerCase().includes(q)
+      ),
+    }
+  }, [results, query])
+
+  const hasRestaurants = displayed?.restaurants?.length > 0
+  const hasFoodItems   = displayed?.foodItems?.length > 0
   const hasAny         = hasRestaurants || hasFoodItems
-  const isEmpty        = results !== null && !hasAny
+  const isEmpty        = displayed !== null && !hasAny
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
@@ -176,7 +191,7 @@ export default function SearchBar({ placeholder = 'Search restaurants, dishes, o
                   Restaurants
                 </span>
               </header>
-              {results.restaurants.map((r) => (
+              {displayed.restaurants.map((r) => (
                 <button
                   key={r.id}
                   type="button"
@@ -229,7 +244,7 @@ export default function SearchBar({ placeholder = 'Search restaurants, dishes, o
                   Dishes
                 </span>
               </header>
-              {results.foodItems.map((item) => (
+              {displayed.foodItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"

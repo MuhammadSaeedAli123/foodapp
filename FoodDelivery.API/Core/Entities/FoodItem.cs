@@ -10,8 +10,11 @@ public class FoodItem
     public bool IsAvailable { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public bool HasVariants { get; set; } = false;
+
     public Guid RestaurantId { get; set; }
     public Restaurant? Restaurant { get; set; }
 
-    public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+    public ICollection<OrderItem>      OrderItems { get; set; } = new List<OrderItem>();
+    public ICollection<FoodItemVariant> Variants  { get; set; } = new List<FoodItemVariant>();
 }

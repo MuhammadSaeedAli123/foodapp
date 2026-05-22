@@ -61,7 +61,13 @@ export default function RestaurantDetail() {
       .build()
 
     conn.on('MenuItemChanged', (item) => {
-      setFoodItems(prev => prev.map(f => f.id === item.id ? { ...f, ...item } : f))
+      setFoodItems(prev => prev.map(f => {
+        if (f.id !== item.id) return f
+        // Preserve existing variant data if the event omits it
+        const variants  = item.variants  ?? f.variants
+        const hasVariants = item.hasVariants ?? f.hasVariants
+        return { ...f, ...item, variants, hasVariants }
+      }))
       // Flash the changed item for 1.5 s so the user notices
       setChangedId(item.id)
       setTimeout(() => setChangedId(null), 1500)

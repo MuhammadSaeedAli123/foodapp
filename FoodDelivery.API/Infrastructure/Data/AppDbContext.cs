@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<Category>         Categories       => Set<Category>();
     public DbSet<Restaurant>       Restaurants      => Set<Restaurant>();
     public DbSet<FoodItem>         FoodItems        => Set<FoodItem>();
+    public DbSet<FoodItemVariant>  FoodItemVariants => Set<FoodItemVariant>();
     public DbSet<Order>            Orders           => Set<Order>();
     public DbSet<OrderItem>        OrderItems       => Set<OrderItem>();
     public DbSet<Vehicle>          Vehicles         => Set<Vehicle>();
@@ -81,6 +82,15 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<FoodItem>()
             .Property(f => f.Price).HasPrecision(10, 2);
+
+        modelBuilder.Entity<FoodItemVariant>()
+            .HasOne(v => v.FoodItem)
+            .WithMany(f => f.Variants)
+            .HasForeignKey(v => v.FoodItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FoodItemVariant>()
+            .Property(v => v.Price).HasPrecision(10, 2);
 
         modelBuilder.Entity<Order>()
             .Property(o => o.TotalAmount).HasPrecision(10, 2);

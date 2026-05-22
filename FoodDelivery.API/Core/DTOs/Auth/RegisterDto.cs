@@ -13,11 +13,22 @@ public class RegisterDto
     [Required, MinLength(6)]
     public string Password { get; set; } = string.Empty;
 
-    [MaxLength(20)]
+    [Required, MaxLength(20)]
     public string PhoneNumber { get; set; } = string.Empty;
 
+    [MaxLength(300)]
     public string Address { get; set; } = string.Empty;
 
     // Only "User" or "Rider" allowed on self-register; Admin is seeded
     public string Role { get; set; } = "User";
+
+    // Rider-specific
+    [MaxLength(15)]
+    public string Cnic { get; set; } = string.Empty;
+
+    [MaxLength(20)]
+    public string VehicleNumber { get; set; } = string.Empty;
+
+    [MaxLength(30)]
+    public string VehicleColor { get; set; } = string.Empty;
 }
