@@ -15,6 +15,11 @@ public class User
     public bool IsOnline { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Rider onboarding
+    public string  City             { get; set; } = string.Empty;
+    public string  ApprovalStatus   { get; set; } = "Approved"; // Pending | Approved | Rejected
+    public string? RejectionReason  { get; set; }
+
     // KitchenStaff: FK to the restaurant they work at (null for all other roles)
     public Guid?        RestaurantId     { get; set; }
     public Restaurant?  StaffRestaurant  { get; set; }

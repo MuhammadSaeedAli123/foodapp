@@ -6,7 +6,7 @@ import { toast } from '../components/common/Toast'
 
 const EMPTY = {
   fullName: '', email: '', password: '', phoneNumber: '', address: '',
-  role: 'User', cnic: '', vehicleNumber: '', vehicleColor: '',
+  role: 'User', cnic: '', city: '', vehicleNumber: '', vehicleColor: '',
 }
 
 export default function Register() {
@@ -38,21 +38,25 @@ export default function Register() {
     e.preventDefault()
     setError('')
     try {
-      await register(form)
+      const userObj = await register(form)
 
       if (isRider && vehicleImage?.file) {
         setUploading(true)
         try {
           await riderApi.uploadVehicleImage(vehicleImage.file)
         } catch {
-          // non-fatal — rider can upload photo from their dashboard later
+          // non-fatal — admin can see details, rider uploads photo later if needed
         } finally {
           setUploading(false)
         }
       }
 
-      toast('Account created! Welcome aboard.', 'success')
-      navigate('/')
+      if (userObj.approvalStatus === 'Pending') {
+        navigate('/pending-approval')
+      } else {
+        toast('Account created! Welcome aboard.', 'success')
+        navigate('/')
+      }
     } catch (err) {
       setError(err.message)
     }
@@ -96,17 +100,17 @@ export default function Register() {
               <label className="block text-sm font-medium text-gray-700 mb-2">I want to join as</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: 'User',  label: 'Customer', icon: '🛍️' },
-                  { value: 'Rider', label: 'Rider',    icon: '🛵' },
-                ].map(({ value, label, icon }) => (
+                  { value: 'User',  label: 'Customer' },
+                  { value: 'Rider', label: 'Rider'    },
+                ].map(({ value, label }) => (
                   <button key={value} type="button"
                     onClick={() => setForm(p => ({ ...p, role: value }))}
-                    className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                    className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                       form.role === value
                         ? 'border-brand-500 bg-brand-50 text-brand-600'
                         : 'border-gray-200 text-gray-500 hover:border-gray-300'
                     }`}>
-                    <span>{icon}</span>{label}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -114,8 +118,8 @@ export default function Register() {
 
             {/* ── Personal Information ─────────────────── */}
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <span>👤</span> Personal Information
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                Personal Information
               </p>
               <div className="space-y-3">
 
@@ -125,6 +129,7 @@ export default function Register() {
                   </label>
                   <input name="fullName" type="text" required
                     value={form.fullName} onChange={set}
+                    onCopy={e => e.preventDefault()}
                     placeholder="John Doe" className="input-field" />
                 </div>
 
@@ -134,6 +139,7 @@ export default function Register() {
                   </label>
                   <input name="email" type="email" required autoComplete="email"
                     value={form.email} onChange={set}
+                    onCopy={e => e.preventDefault()}
                     placeholder="you@example.com" className="input-field" />
                 </div>
 
@@ -144,6 +150,7 @@ export default function Register() {
                   <div className="relative">
                     <input name="password" type={show ? 'text' : 'password'} required minLength={6}
                       value={form.password} onChange={set}
+                      onCopy={e => e.preventDefault()}
                       placeholder="Min. 6 characters" className="input-field pr-12" />
                     <button type="button" onClick={() => setShow(s => !s)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -161,6 +168,7 @@ export default function Register() {
                   </label>
                   <input name="phoneNumber" type="tel" required
                     value={form.phoneNumber} onChange={set}
+                    onCopy={e => e.preventDefault()}
                     placeholder="+1 234 567 8900" className="input-field" />
                 </div>
 
@@ -171,6 +179,7 @@ export default function Register() {
                     </label>
                     <textarea name="address" rows={2}
                       value={form.address} onChange={set}
+                      onCopy={e => e.preventDefault()}
                       placeholder="e.g. 123 Main St, Apt 4B, New York"
                       className="input-field resize-none" />
                     <p className="text-xs text-gray-400 mt-1">Used to pre-fill your delivery address at checkout</p>
@@ -183,8 +192,8 @@ export default function Register() {
             {/* ── Rider-Specific Information ───────────── */}
             {isRider && (
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <span>🛵</span> Rider Information
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                  Rider Information
                 </p>
                 <div className="space-y-3">
 
@@ -194,8 +203,19 @@ export default function Register() {
                     </label>
                     <input name="cnic" type="text" required={isRider}
                       value={form.cnic} onChange={set}
+                      onCopy={e => e.preventDefault()}
                       placeholder="e.g. 42101-1234567-1" className="input-field" />
                     <p className="text-xs text-gray-400 mt-1">Used for identity verification — must be unique</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      City / Operating Area <span className="text-red-500">*</span>
+                    </label>
+                    <input name="city" type="text" required={isRider}
+                      value={form.city} onChange={set}
+                      onCopy={e => e.preventDefault()}
+                      placeholder="e.g. Karachi, Lahore" className="input-field" />
                   </div>
 
                   <div>
@@ -204,6 +224,7 @@ export default function Register() {
                     </label>
                     <input name="vehicleNumber" type="text" required={isRider}
                       value={form.vehicleNumber} onChange={set}
+                      onCopy={e => e.preventDefault()}
                       placeholder="e.g. ABC-123" className="input-field" />
                   </div>
 
@@ -213,6 +234,7 @@ export default function Register() {
                     </label>
                     <input name="vehicleColor" type="text"
                       value={form.vehicleColor} onChange={set}
+                      onCopy={e => e.preventDefault()}
                       placeholder="e.g. Red, Black, Silver" className="input-field" />
                   </div>
 
@@ -256,7 +278,29 @@ export default function Register() {
             <button type="submit" disabled={loading || uploading} className="btn-primary w-full">
               {uploading ? 'Uploading photo…' : loading ? 'Creating account…' : 'Create Account'}
             </button>
+
+            {isRider && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center leading-relaxed">
+                🔍 Rider accounts require admin review before you can access the app.
+              </p>
+            )}
           </form>
+
+          {/* Restaurant Owner CTA */}
+          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-500 mb-3">
+              Are you a Restaurant Owner?
+            </p>
+            <Link
+              to="/restaurant-apply"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-brand-200 text-brand-600 font-semibold text-sm hover:bg-brand-50 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              Apply for Restaurant Partnership
+            </Link>
+          </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{' '}

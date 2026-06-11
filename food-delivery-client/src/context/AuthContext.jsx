@@ -14,10 +14,11 @@ export function AuthProvider({ children }) {
     try {
       const data = await authApi.login({ email, password })
       const userObj = {
-        id:       data.userId,
-        fullName: data.fullName,
-        email:    data.email,
-        role:     data.role,
+        id:             data.userId,
+        fullName:       data.fullName,
+        email:          data.email,
+        role:           data.role,
+        approvalStatus: data.approvalStatus ?? 'Approved',
       }
       saveAuth(data.token, userObj)
       setToken(data.token)
@@ -50,12 +51,13 @@ export function AuthProvider({ children }) {
     try {
       const data = await authApi.register(formData)
       const userObj = {
-        id:          data.userId,
-        fullName:    data.fullName,
-        email:       data.email,
-        role:        data.role,
-        phoneNumber: formData.phoneNumber ?? null,
-        address:     formData.address     ?? null,
+        id:             data.userId,
+        fullName:       data.fullName,
+        email:          data.email,
+        role:           data.role,
+        approvalStatus: data.approvalStatus ?? 'Approved',
+        phoneNumber:    formData.phoneNumber ?? null,
+        address:        formData.address     ?? null,
       }
       saveAuth(data.token, userObj)
       setToken(data.token)

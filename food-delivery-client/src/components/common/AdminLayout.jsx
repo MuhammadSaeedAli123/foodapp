@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { adminApi } from '../../api/users'
 
 const NAV = [
   { label: 'Dashboard',   path: '/admin',               icon: (
@@ -39,20 +40,45 @@ const NAV = [
         d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   )},
+  { label: 'Restaurant Requests', path: '/admin/restaurant-requests', icon: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+  )},
 ]
 
 export default function AdminLayout({ children, title }) {
   const { user, logout } = useAuth()
   const location  = useLocation()
   const navigate  = useNavigate()
-  const [collapsed,   setCollapsed]   = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [mobileOpen,  setMobileOpen]  = useState(false)
+  const [collapsed,     setCollapsed]     = useState(false)
+  const [profileOpen,   setProfileOpen]   = useState(false)
+  const [mobileOpen,    setMobileOpen]    = useState(false)
+  const [pendingRiders,       setPendingRiders]       = useState(0)
+  const [pendingRestaurants,  setPendingRestaurants]  = useState(0)
+  const [bellOpen,            setBellOpen]            = useState(false)
   const profileRef = useRef(null)
+  const bellRef    = useRef(null)
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await adminApi.getNotifications()
+      setPendingRiders(res?.pendingRiders ?? 0)
+      setPendingRestaurants(res?.pendingRestaurants ?? 0)
+    } catch { /* non-fatal */ }
+  }, [])
+
+  useEffect(() => {
+    fetchNotifications()
+    const id = setInterval(fetchNotifications, 30_000)
+    return () => clearInterval(id)
+  }, [fetchNotifications])
 
   useEffect(() => {
     const handler = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false)
+      if (bellRef.current    && !bellRef.current.contains(e.target))    setBellOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -165,13 +191,65 @@ export default function AdminLayout({ children, title }) {
           {/* Right cluster */}
           <div className="flex items-center gap-2">
             {/* Notification bell */}
-            <button className="relative w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            <div className="relative" ref={bellRef}>
+              <button onClick={() => setBellOpen(p => !p)}
+                className="relative w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {(pendingRiders + pendingRestaurants) > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {(pendingRiders + pendingRestaurants) > 99 ? '99+' : (pendingRiders + pendingRestaurants)}
+                  </span>
+                )}
+              </button>
+
+              {bellOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <p className="font-semibold text-gray-800 text-sm">Notifications</p>
+                    {(pendingRiders + pendingRestaurants) > 0 && (
+                      <span className="text-xs bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full">
+                        {pendingRiders + pendingRestaurants} pending
+                      </span>
+                    )}
+                  </div>
+                  {(pendingRiders + pendingRestaurants) === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-gray-400">No new notifications</div>
+                  ) : (
+                    <div>
+                      {pendingRiders > 0 && (
+                        <Link to="/admin/riders?tab=pending"
+                          onClick={() => setBellOpen(false)}
+                          className="flex items-start gap-3 px-4 py-3 hover:bg-orange-50 transition-colors border-b border-gray-50">
+                          <span className="text-xl mt-0.5">🛵</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">
+                              {pendingRiders} rider{pendingRiders !== 1 ? 's' : ''} awaiting approval
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">Click to review in Manage Riders</p>
+                          </div>
+                        </Link>
+                      )}
+                      {pendingRestaurants > 0 && (
+                        <Link to="/admin/restaurant-requests"
+                          onClick={() => setBellOpen(false)}
+                          className="flex items-start gap-3 px-4 py-3 hover:bg-orange-50 transition-colors">
+                          <span className="text-xl mt-0.5">🏪</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">
+                              {pendingRestaurants} restaurant application{pendingRestaurants !== 1 ? 's' : ''} pending
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">Click to review in Restaurant Requests</p>
+                          </div>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Profile chip */}
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">

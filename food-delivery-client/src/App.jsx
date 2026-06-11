@@ -10,6 +10,8 @@ import NotFound from './pages/NotFound'
 import Home              from './pages/Home'
 import Login             from './pages/Login'
 import Register          from './pages/Register'
+import PendingApproval   from './pages/PendingApproval'
+import RestaurantApply   from './pages/RestaurantApply'
 import ForgotPassword    from './pages/ForgotPassword'
 import RestaurantDetail  from './pages/RestaurantDetail'
 import Cart              from './pages/Cart'
@@ -25,7 +27,8 @@ import ManageOrders         from './pages/admin/ManageOrders'
 import ManageFoodItems      from './pages/admin/ManageFoodItems'
 import ManageWorkers        from './pages/admin/ManageWorkers'
 import ManageRiders         from './pages/admin/ManageRiders'
-import ManageOwners         from './pages/admin/ManageOwners'
+import ManageOwners             from './pages/admin/ManageOwners'
+import RestaurantRequests       from './pages/admin/RestaurantRequests'
 
 // Rider pages
 import RiderDashboard from './pages/rider/RiderDashboard'
@@ -55,6 +58,8 @@ export default function App() {
             <Route path="/login"              element={<Login />} />
             <Route path="/register"           element={<Register />} />
             <Route path="/forgot-password"    element={<ForgotPassword />} />
+            <Route path="/pending-approval"   element={<PendingApproval />} />
+            <Route path="/restaurant-apply"   element={<RestaurantApply />} />
             <Route path="/restaurants/:id"    element={<RestaurantDetail />} />
 
             {/* User */}
@@ -118,6 +123,11 @@ export default function App() {
             <Route path="/admin/owners" element={
               <ProtectedRoute roles={['Admin']}>
                 <ManageOwners />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/restaurant-requests" element={
+              <ProtectedRoute roles={['Admin']}>
+                <RestaurantRequests />
               </ProtectedRoute>
             } />
 

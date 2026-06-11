@@ -55,7 +55,7 @@ public class UsersController : BaseController
         {
             user.Id, user.FullName, user.Email, user.PhoneNumber,
             user.Address, user.Role, user.Cnic, user.CreatedAt,
-            user.ProfilePhotoUrl,
+            user.ProfilePhotoUrl, user.ApprovalStatus,
             RestaurantId   = restaurantId,
             RestaurantName = restaurantName
         });
@@ -105,6 +105,96 @@ public class UsersController : BaseController
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Password updated successfully." });
+    }
+
+    /// <summary>DELETE /api/users/me — permanently delete own account and all associated data</summary>
+    [HttpDelete("me")]
+    [Authorize(Roles = "User,Rider,RestaurantOwner")]
+    public async Task<IActionResult> DeleteAccount()
+    {
+        var user = await _db.Users.FindAsync(CurrentUserId);
+        if (user == null) return NotFound();
+
+        // ── Step 1: role-specific cleanup ────────────────────────────────────
+
+        if (user.Role == "User")
+        {
+            // Reviews written by this customer
+            _db.Reviews.RemoveRange(_db.Reviews.Where(r => r.UserId == CurrentUserId));
+
+            // Orders (+ items) placed by this customer
+            var orders = await _db.Orders
+                .Include(o => o.OrderItems)
+                .Where(o => o.UserId == CurrentUserId)
+                .ToListAsync();
+            foreach (var o in orders) _db.OrderItems.RemoveRange(o.OrderItems);
+            _db.Orders.RemoveRange(orders);
+        }
+        else if (user.Role == "Rider")
+        {
+            // Nullify rider reference on delivered/active orders (nullable FK)
+            var riderOrders = await _db.Orders
+                .Where(o => o.RiderId == CurrentUserId)
+                .ToListAsync();
+            foreach (var o in riderOrders) o.RiderId = null;
+
+            // Explicitly delete vehicle — do NOT rely on EF/SQLite cascade
+            var vehicle = await _db.Vehicles
+                .FirstOrDefaultAsync(v => v.RiderId == CurrentUserId);
+            if (vehicle != null) _db.Vehicles.Remove(vehicle);
+        }
+        else if (user.Role == "RestaurantOwner")
+        {
+            var restaurants = await _db.Restaurants
+                .Where(r => r.OwnerId == CurrentUserId)
+                .ToListAsync();
+
+            foreach (var restaurant in restaurants)
+            {
+                // Detach kitchen staff
+                var staff = await _db.Users
+                    .Where(u => u.RestaurantId == restaurant.Id)
+                    .ToListAsync();
+                foreach (var s in staff) s.RestaurantId = null;
+
+                // Orders + items for this restaurant
+                var orders = await _db.Orders
+                    .Include(o => o.OrderItems)
+                    .Where(o => o.RestaurantId == restaurant.Id)
+                    .ToListAsync();
+                foreach (var o in orders) _db.OrderItems.RemoveRange(o.OrderItems);
+                _db.Orders.RemoveRange(orders);
+
+                // Reviews for this restaurant
+                _db.Reviews.RemoveRange(
+                    _db.Reviews.Where(r => r.RestaurantId == restaurant.Id));
+
+                // Food items (FoodItemVariants cascade at DB level — safe here)
+                var foodItems = await _db.FoodItems
+                    .Include(f => f.Variants)
+                    .Where(f => f.RestaurantId == restaurant.Id)
+                    .ToListAsync();
+                foreach (var f in foodItems) _db.FoodItemVariants.RemoveRange(f.Variants);
+                _db.FoodItems.RemoveRange(foodItems);
+
+                _db.Restaurants.Remove(restaurant);
+            }
+
+            // Reviews written by the owner
+            _db.Reviews.RemoveRange(_db.Reviews.Where(r => r.UserId == CurrentUserId));
+        }
+
+        // ── Step 2: common cleanup for every role ─────────────────────────────
+
+        // Explicitly delete password-reset OTPs — do NOT rely on EF/SQLite cascade
+        _db.PasswordResetOtps.RemoveRange(
+            _db.PasswordResetOtps.Where(o => o.UserId == CurrentUserId));
+
+        // ── Step 3: delete the user ───────────────────────────────────────────
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync();
+
+        return NoContent();
     }
 
     // ── Admin: all users ─────────────────────────────────────────────────────

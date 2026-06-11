@@ -23,6 +23,9 @@ public class RegisterDto
     public string Role { get; set; } = "User";
 
     // Rider-specific
+    [MaxLength(100)]
+    public string City { get; set; } = string.Empty;
+
     [MaxLength(15)]
     public string Cnic { get; set; } = string.Empty;
 

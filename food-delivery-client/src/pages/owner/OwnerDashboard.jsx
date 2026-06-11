@@ -300,13 +300,13 @@ export default function OwnerDashboard() {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-4 mt-4 text-xs text-gray-500">
-                {r.address     && <span>📍 {r.address}</span>}
-                {r.phoneNumber && <span>📞 {r.phoneNumber}</span>}
-                <span>🚚 {r.deliveryTime} min · {formatCurrency(r.deliveryFee)} fee</span>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 mt-12 text-xs text-gray-600">
+                {r.address     && <span className="flex items-center gap-1.5">📍 {r.address}</span>}
+                {r.phoneNumber && <span className="flex items-center gap-1.5">📞 {r.phoneNumber}</span>}
+                <span className="flex items-center gap-1.5">🚚 {r.deliveryTime} min · {formatCurrency(r.deliveryFee)} fee</span>
                 {r.openTime && r.closeTime
-                  ? <span>🕐 {fmt12(r.openTime)} – {fmt12(r.closeTime)}</span>
-                  : <span>🕐 24 / 7</span>}
+                  ? <span className="flex items-center gap-1.5">🕐 {fmt12(r.openTime)} – {fmt12(r.closeTime)}</span>
+                  : <span className="flex items-center gap-1.5">🕐 24 / 7</span>}
               </div>
             </div>
           </div>

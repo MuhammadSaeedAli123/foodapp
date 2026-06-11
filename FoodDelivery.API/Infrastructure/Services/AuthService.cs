@@ -12,13 +12,15 @@ namespace FoodDelivery.API.Infrastructure.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext  _db;
     private readonly IConfiguration _config;
+    private readonly IEmailService  _email;
 
-    public AuthService(AppDbContext db, IConfiguration config)
+    public AuthService(AppDbContext db, IConfiguration config, IEmailService email)
     {
-        _db = db;
+        _db     = db;
         _config = config;
+        _email  = email;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
@@ -35,21 +37,26 @@ public class AuthService : IAuthService
                 throw new ArgumentException("CNIC already registered.");
         }
 
+        var isRider = role == "Rider";
+
         var user = new User
         {
-            FullName     = dto.FullName,
-            Email        = dto.Email.ToLower(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            PhoneNumber  = dto.PhoneNumber,
-            Address      = role == "User" ? dto.Address : string.Empty,
-            Cnic         = role == "Rider" ? dto.Cnic : string.Empty,
-            Role         = role
+            FullName        = dto.FullName,
+            Email           = dto.Email.ToLower(),
+            PasswordHash    = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            PhoneNumber     = dto.PhoneNumber,
+            Address         = isRider ? string.Empty : dto.Address,
+            Cnic            = isRider ? dto.Cnic : string.Empty,
+            City            = isRider ? dto.City : string.Empty,
+            Role            = role,
+            ApprovalStatus  = isRider ? "Pending" : "Approved",
         };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        if (role == "Rider" && !string.IsNullOrWhiteSpace(dto.VehicleNumber))
+        string vehicleType = "Bike";
+        if (isRider && !string.IsNullOrWhiteSpace(dto.VehicleNumber))
         {
             _db.Vehicles.Add(new Vehicle
             {
@@ -58,9 +65,19 @@ public class AuthService : IAuthService
                 Color              = dto.VehicleColor,
                 Model              = string.Empty,
                 Year               = DateTime.UtcNow.Year,
-                Type               = "Bike"
+                Type               = vehicleType
             });
             await _db.SaveChangesAsync();
+        }
+
+        // Notify admin about new rider (fire-and-forget — don't fail registration if email fails)
+        if (isRider)
+        {
+            var adminEmail = _config["EmailSettings:AdminEmail"] ?? _config["EmailSettings:SenderEmail"]!;
+            _ = _email.SendRiderRegistrationToAdminAsync(
+                adminEmail,
+                dto.FullName, dto.Email, dto.PhoneNumber,
+                dto.Cnic, vehicleType, dto.VehicleNumber, dto.City);
         }
 
         return BuildResponse(user);
@@ -76,16 +93,30 @@ public class AuthService : IAuthService
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Account is disabled.");
 
+        if (user.Role == "Rider")
+        {
+            if (user.ApprovalStatus == "Pending")
+                throw new UnauthorizedAccessException("Your account is pending admin approval. You will receive an email once reviewed.");
+            if (user.ApprovalStatus == "Rejected")
+            {
+                var msg = string.IsNullOrWhiteSpace(user.RejectionReason)
+                    ? "Your rider application was not approved."
+                    : $"Your rider application was not approved. Reason: {user.RejectionReason}";
+                throw new UnauthorizedAccessException(msg);
+            }
+        }
+
         return BuildResponse(user);
     }
 
     private AuthResponseDto BuildResponse(User user) => new()
     {
-        Token = GenerateToken(user),
-        FullName = user.FullName,
-        Email = user.Email,
-        Role = user.Role,
-        UserId = user.Id
+        Token          = GenerateToken(user),
+        FullName       = user.FullName,
+        Email          = user.Email,
+        Role           = user.Role,
+        UserId         = user.Id,
+        ApprovalStatus = user.ApprovalStatus,
     };
 
     private string GenerateToken(User user)

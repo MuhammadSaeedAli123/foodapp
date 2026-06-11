@@ -35,3 +35,18 @@ export const usersApi = {
   // Shared
   toggleActive:  (id) => api.patch(`/users/${id}/toggle`, {}),
 }
+
+export const adminApi = {
+  getNotifications:              ()             => api.get('/admin/notifications'),
+  getPendingRiders:              ()             => api.get('/admin/riders/pending'),
+  approveRider:                  (id)           => api.post(`/admin/riders/${id}/approve`),
+  rejectRider:                   (id, reason)   => api.post(`/admin/riders/${id}/reject`, { reason }),
+
+  getRestaurantApplications:     (status = 'Pending') => api.get(`/admin/restaurant-applications?status=${status}`),
+  approveRestaurantApplication:  (id)           => api.post(`/admin/restaurant-applications/${id}/approve`),
+  rejectRestaurantApplication:   (id, reason)   => api.post(`/admin/restaurant-applications/${id}/reject`, { reason }),
+}
+
+export const restaurantApplicationApi = {
+  submit: (formData) => api.post('/restaurant-applications', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+}

@@ -16,7 +16,8 @@ public class AppDbContext : DbContext
     public DbSet<OrderItem>        OrderItems       => Set<OrderItem>();
     public DbSet<Vehicle>          Vehicles         => Set<Vehicle>();
     public DbSet<Review>           Reviews          => Set<Review>();
-    public DbSet<PasswordResetOtp> PasswordResetOtps => Set<PasswordResetOtp>();
+    public DbSet<PasswordResetOtp>       PasswordResetOtps       => Set<PasswordResetOtp>();
+    public DbSet<RestaurantApplication>  RestaurantApplications  => Set<RestaurantApplication>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

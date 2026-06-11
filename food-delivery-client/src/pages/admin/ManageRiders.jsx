@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import AdminLayout from '../../components/common/AdminLayout'
-import { usersApi } from '../../api/users'
+import { usersApi, adminApi } from '../../api/users'
 import { formatDate } from '../../utils/formatters'
 import { toast } from '../../components/common/Toast'
 
@@ -311,10 +312,51 @@ const CheckIcon = () => (
   </svg>
 )
 
+// ── Reject Modal ──────────────────────────────────────────────────────────────
+function RejectModal({ rider, onConfirm, onClose }) {
+  const [reason, setReason]   = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleConfirm = async () => {
+    setLoading(true)
+    try { await onConfirm(rider.id, reason) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full">
+        <h3 className="font-bold text-gray-900 mb-1">Reject Application</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Reject <strong>{rider.fullName}</strong>'s rider application?
+          An email will be sent with the reason.
+        </p>
+        <textarea
+          value={reason} onChange={e => setReason(e.target.value)}
+          placeholder="Reason (optional — will be included in the email)"
+          rows={3}
+          className="input-field resize-none text-sm mb-4"
+        />
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 btn-secondary">Cancel</button>
+          <button onClick={handleConfirm} disabled={loading} className="flex-1 btn-danger">
+            {loading ? 'Rejecting…' : 'Reject'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ManageRiders() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get('tab') === 'pending' ? 'pending' : 'all'
+
   const [riders, setRiders]         = useState([])
   const [loading, setLoading]       = useState(true)
+  const [pending, setPending]       = useState([])
+  const [loadingPending, setLoadingPending] = useState(true)
   const [form, setForm]             = useState(EMPTY)
   const [errors, setErrors]         = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -322,6 +364,7 @@ export default function ManageRiders() {
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [viewTarget, setViewTarget] = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
 
   const [photoFile, setPhotoFile]         = useState(null)
   const [photoPreview, setPhotoPreview]   = useState(null)
@@ -331,10 +374,37 @@ export default function ManageRiders() {
 
   useEffect(() => {
     usersApi.getRiders()
-      .then(setRiders)
+      .then(r => setRiders(Array.isArray(r) ? r : []))
       .catch(() => toast('Failed to load riders', 'error'))
       .finally(() => setLoading(false))
   }, [])
+
+  const fetchPending = () => {
+    setLoadingPending(true)
+    adminApi.getPendingRiders()
+      .then(r => setPending(Array.isArray(r) ? r : []))
+      .catch(() => toast('Failed to load pending riders', 'error'))
+      .finally(() => setLoadingPending(false))
+  }
+
+  useEffect(() => { fetchPending() }, [])
+
+  const handleApprove = async (id) => {
+    try {
+      await adminApi.approveRider(id)
+      setPending(prev => prev.filter(r => r.id !== id))
+      toast('Rider approved — confirmation email sent', 'success')
+    } catch { toast('Failed to approve rider', 'error') }
+  }
+
+  const handleReject = async (id, reason) => {
+    try {
+      await adminApi.rejectRider(id, reason)
+      setPending(prev => prev.filter(r => r.id !== id))
+      setRejectTarget(null)
+      toast('Rider rejected — notification email sent', 'success')
+    } catch { toast('Failed to reject rider', 'error') }
+  }
 
   const UPPER_FIELDS = ['vehicleRegistration', 'vehicleModel']
   const handleChange = (field) => (e) => {
@@ -516,101 +586,187 @@ export default function ManageRiders() {
 
         {/* ── Rider List ────────────────────────────────────────────────── */}
         <div className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-gray-900">
+
+          {/* Tabs */}
+          <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
+            <button
+              onClick={() => setSearchParams({})}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                activeTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}>
               All Riders
-              <span className="ml-2 text-sm font-normal text-gray-400">({riders.length})</span>
-            </h2>
+              <span className="ml-1.5 text-xs text-gray-400">({riders.length})</span>
+            </button>
+            <button
+              onClick={() => setSearchParams({ tab: 'pending' })}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              Pending Approval
+              {pending.length > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {pending.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          {loading ? (
-            <div className="space-y-3">
-              {[1,2,3].map(i => (
-                <div key={i} className="card p-4 animate-pulse">
-                  <div className="flex gap-4">
-                    <div className="w-24 h-24 rounded-full bg-gray-200 shrink-0" />
-                    <div className="flex-1 space-y-2 pt-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/3" />
-                      <div className="h-3 bg-gray-100 rounded w-1/2" />
-                      <div className="h-3 bg-gray-100 rounded w-2/3" />
+          {/* ── All Riders tab ── */}
+          {activeTab === 'all' && (
+            loading ? (
+              <div className="space-y-3">
+                {[1,2,3].map(i => (
+                  <div key={i} className="card p-4 animate-pulse">
+                    <div className="flex gap-4">
+                      <div className="w-24 h-24 rounded-full bg-gray-200 shrink-0" />
+                      <div className="flex-1 space-y-2 pt-2">
+                        <div className="h-4 bg-gray-200 rounded w-1/3" />
+                        <div className="h-3 bg-gray-100 rounded w-1/2" />
+                        <div className="h-3 bg-gray-100 rounded w-2/3" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : riders.length === 0 ? (
-            <div className="text-center py-16 card">
-              <p className="text-5xl mb-3">🛵</p>
-              <p className="text-gray-500 font-medium">No riders yet</p>
-              <p className="text-gray-400 text-sm mt-1">Create your first rider using the form.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {riders.map(r => (
-                <div key={r.id} className="card p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setViewTarget(r)}>
-                  <div className="flex items-start gap-3">
+                ))}
+              </div>
+            ) : riders.length === 0 ? (
+              <div className="text-center py-16 card">
+                <p className="text-5xl mb-3">🛵</p>
+                <p className="text-gray-500 font-medium">No riders yet</p>
+                <p className="text-gray-400 text-sm mt-1">Create your first rider using the form.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {riders.map(r => (
+                  <div key={r.id} className="card p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setViewTarget(r)}>
+                    <div className="flex items-start gap-3">
 
-                    {/* Avatar */}
-                    <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
-                      {r.profilePhotoUrl
-                        ? <img src={r.profilePhotoUrl} alt={r.fullName} className="w-full h-full object-cover" />
-                        : <span className="text-brand-600 font-bold text-xl sm:text-3xl">{r.fullName?.[0]?.toUpperCase()}</span>
-                      }
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-gray-900">{r.fullName}</p>
-                        <span className={`badge text-xs ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                          {r.isActive ? 'Active' : 'Inactive'}
-                        </span>
+                      {/* Avatar */}
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
+                        {r.profilePhotoUrl
+                          ? <img src={r.profilePhotoUrl} alt={r.fullName} className="w-full h-full object-cover" />
+                          : <span className="text-brand-600 font-bold text-xl sm:text-3xl">{r.fullName?.[0]?.toUpperCase()}</span>
+                        }
                       </div>
-                      <p className="text-sm text-gray-500 truncate">{r.email}</p>
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400">
-                        <span>📞 {r.phoneNumber}</span>
-                        <span>🪪 {r.cnic}</span>
-                        <span>📅 {formatDate(r.createdAt)}</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5 truncate">📍 {r.address}</p>
 
-                      {/* Vehicle strip */}
-                      {r.vehicle && (
-                        <div className="mt-3 flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl">
-                          {r.vehicle.pictureUrl ? (
-                            <img src={r.vehicle.pictureUrl} alt="vehicle"
-                              className="w-14 h-10 rounded-lg object-cover shrink-0 border border-gray-200" />
-                          ) : (
-                            <div className="w-14 h-10 rounded-lg bg-gray-200 flex items-center justify-center shrink-0 text-xl">
-                              {r.vehicle.type === 'Car' ? '🚗' : r.vehicle.type === 'Scooter' ? '🛵' : '🏍️'}
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-gray-700 truncate">
-                              {r.vehicle.type} · {r.vehicle.model} ({r.vehicle.year})
-                            </p>
-                            <p className="text-xs text-gray-400">{r.vehicle.registrationNumber}</p>
-                          </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-900">{r.fullName}</p>
+                          <span className={`badge text-xs ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                            {r.isActive ? 'Active' : 'Inactive'}
+                          </span>
                         </div>
-                      )}
+                        <p className="text-sm text-gray-500 truncate">{r.email}</p>
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400">
+                          <span>📞 {r.phoneNumber}</span>
+                          <span>🪪 {r.cnic}</span>
+                          <span>📅 {formatDate(r.createdAt)}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5 truncate">📍 {r.address}</p>
+
+                        {/* Vehicle strip */}
+                        {r.vehicle && (
+                          <div className="mt-3 flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl">
+                            {r.vehicle.pictureUrl ? (
+                              <img src={r.vehicle.pictureUrl} alt="vehicle"
+                                className="w-14 h-10 rounded-lg object-cover shrink-0 border border-gray-200" />
+                            ) : (
+                              <div className="w-14 h-10 rounded-lg bg-gray-200 flex items-center justify-center shrink-0 text-xl">
+                                {r.vehicle.type === 'Car' ? '🚗' : r.vehicle.type === 'Scooter' ? '🛵' : '🏍️'}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-700 truncate">
+                                {r.vehicle.type} · {r.vehicle.model} ({r.vehicle.year})
+                              </p>
+                              <p className="text-xs text-gray-400">{r.vehicle.registrationNumber}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions — desktop */}
+                      <div className="hidden sm:flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setEditTarget(r)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">Edit</button>
+                        <button onClick={() => handleToggle(r.id)} className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${r.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{r.isActive ? 'Deactivate' : 'Activate'}</button>
+                        <button onClick={() => setDeleteTarget(r)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">Delete</button>
+                      </div>
+                    </div>
+                    {/* Actions — mobile */}
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50 sm:hidden" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setEditTarget(r)} className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">Edit</button>
+                      <button onClick={() => handleToggle(r.id)} className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${r.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{r.isActive ? 'Deactivate' : 'Activate'}</button>
+                      <button onClick={() => setDeleteTarget(r)} className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* ── Pending Approval tab ── */}
+          {activeTab === 'pending' && (
+            loadingPending ? (
+              <div className="space-y-3">
+                {[1,2].map(i => (
+                  <div key={i} className="card p-4 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-2/3" />
+                  </div>
+                ))}
+              </div>
+            ) : pending.length === 0 ? (
+              <div className="text-center py-16 card">
+                <p className="text-5xl mb-3">✅</p>
+                <p className="text-gray-500 font-medium">No pending applications</p>
+                <p className="text-gray-400 text-sm mt-1">All rider applications have been reviewed.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pending.map(r => (
+                  <div key={r.id} className="card p-4 border-l-4 border-orange-400">
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0 font-bold text-orange-600 text-lg">
+                        {r.fullName?.[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                          <p className="font-semibold text-gray-900">{r.fullName}</p>
+                          <span className="text-[10px] font-bold uppercase tracking-wide bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">Pending</span>
+                        </div>
+                        <p className="text-sm text-gray-500">{r.email}</p>
+                        <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-400">
+                          <span>📞 {r.phoneNumber}</span>
+                          <span>🪪 {r.cnic || '—'}</span>
+                          <span>📍 {r.city || '—'}</span>
+                          <span>📅 {formatDate(r.createdAt)}</span>
+                        </div>
+                        {r.vehicle && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                            <span>{r.vehicle.type === 'Car' ? '🚗' : '🛵'}</span>
+                            <span>{r.vehicle.type} · {r.vehicle.registrationNumber}</span>
+                            {r.vehicle.color && <span>· {r.vehicle.color}</span>}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Actions — desktop */}
-                    <div className="hidden sm:flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setEditTarget(r)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">Edit</button>
-                      <button onClick={() => handleToggle(r.id)} className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${r.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{r.isActive ? 'Deactivate' : 'Activate'}</button>
-                      <button onClick={() => setDeleteTarget(r)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">Delete</button>
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
+                      <button
+                        onClick={() => handleApprove(r.id)}
+                        className="flex-1 text-sm font-semibold py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-colors">
+                        ✓ Approve
+                      </button>
+                      <button
+                        onClick={() => setRejectTarget(r)}
+                        className="flex-1 text-sm font-semibold py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition-colors">
+                        ✕ Reject
+                      </button>
                     </div>
                   </div>
-                  {/* Actions — mobile */}
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50 sm:hidden" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setEditTarget(r)} className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">Edit</button>
-                    <button onClick={() => handleToggle(r.id)} className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${r.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{r.isActive ? 'Deactivate' : 'Activate'}</button>
-                    <button onClick={() => setDeleteTarget(r)} className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -640,6 +796,15 @@ export default function ManageRiders() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Reject Modal ───────────────────────────────────────────────── */}
+      {rejectTarget && (
+        <RejectModal
+          rider={rejectTarget}
+          onConfirm={handleReject}
+          onClose={() => setRejectTarget(null)}
+        />
       )}
     </AdminLayout>
   )

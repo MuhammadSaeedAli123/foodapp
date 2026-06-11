@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/common/Navbar'
 import Footer from '../components/common/Footer'
 import { useAuth } from '../context/AuthContext'
@@ -7,8 +8,111 @@ import { saveAuth, getToken } from '../utils/token'
 import { formatDate } from '../utils/formatters'
 import { toast } from '../components/common/Toast'
 
+// ── Role-specific warning text ────────────────────────────────────────────────
+const DELETE_WARNINGS = {
+  User: [
+    'All your orders and order history',
+    'All your reviews and ratings',
+    'Your profile and personal data',
+  ],
+  Rider: [
+    'Your vehicle information',
+    'Your delivery history references',
+    'Your profile and personal data',
+  ],
+  RestaurantOwner: [
+    'All your restaurants and menus',
+    'All orders placed at your restaurants',
+    'All reviews for your restaurants',
+    'Your profile and personal data',
+  ],
+}
+
+// ── Confirm-delete modal ──────────────────────────────────────────────────────
+function DeleteAccountModal({ role, onConfirm, onClose }) {
+  const [typed, setTyped]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const CONFIRM_PHRASE = 'delete my account'
+  const ready = typed.toLowerCase() === CONFIRM_PHRASE
+
+  const handleConfirm = async () => {
+    setLoading(true)
+    try { await onConfirm() }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+
+        {/* Header */}
+        <div className="bg-red-50 rounded-t-2xl px-6 pt-6 pb-4 border-b border-red-100">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h3 className="font-bold text-red-800 text-lg">Delete Account Permanently</h3>
+          </div>
+          <p className="text-sm text-red-600 ml-13">This action <strong>cannot be undone</strong>.</p>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* What gets deleted */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">The following will be permanently deleted:</p>
+            <ul className="space-y-1.5">
+              {(DELETE_WARNINGS[role] ?? DELETE_WARNINGS.User).map(w => (
+                <li key={w} className="flex items-center gap-2 text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  {w}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Type-to-confirm */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Type <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-red-600">{CONFIRM_PHRASE}</span> to confirm
+            </label>
+            <input
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              placeholder={CONFIRM_PHRASE}
+              className="input-field text-sm"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button onClick={onClose} className="flex-1 btn-secondary">
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={!ready || loading}
+              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                ready
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}>
+              {loading ? 'Deleting…' : 'Delete Permanently'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Profile() {
-  const { user, setUser } = useAuth()
+  const { user, setUser, logout } = useAuth()
+  const navigate = useNavigate()
   const [form, setForm]       = useState({ fullName: '', phoneNumber: '', address: '' })
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -19,6 +123,8 @@ export default function Profile() {
   const [photoUrl, setPhotoUrl]       = useState(null)
   const [photoLoading, setPhotoLoading] = useState(false)
   const fileInputRef = useRef(null)
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // Load real profile data from API on mount
   useEffect(() => {
@@ -41,6 +147,12 @@ export default function Profile() {
       })
       .finally(() => setFetching(false))
   }, [])  // eslint-disable-line
+
+  const handleDeleteAccount = async () => {
+    await authApi.deleteMe()
+    logout()
+    navigate('/', { replace: true })
+  }
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
@@ -155,12 +267,14 @@ export default function Profile() {
                 <input name="phoneNumber" type="tel" value={form.phoneNumber} onChange={handleChange}
                   placeholder="+92 300 1234567" className="input-field" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Default Delivery Address</label>
-                <textarea name="address" rows={2} value={form.address} onChange={handleChange}
-                  placeholder="Your default delivery address" className="input-field resize-none" />
-                <p className="text-xs text-gray-400 mt-1">This will pre-fill the delivery address at checkout.</p>
-              </div>
+              {user?.role !== 'Rider' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Default Delivery Address</label>
+                  <textarea name="address" rows={2} value={form.address} onChange={handleChange}
+                    placeholder="Your default delivery address" className="input-field resize-none" />
+                  <p className="text-xs text-gray-400 mt-1">This will pre-fill the delivery address at checkout.</p>
+                </div>
+              )}
               <button type="submit" disabled={loading} className="btn-primary w-full">
                 {loading ? 'Saving…' : 'Save Changes'}
               </button>
@@ -220,8 +334,29 @@ export default function Profile() {
             </button>
           </form>
         </div>
+
+        {/* Danger Zone */}
+        <div className="card p-6 mt-6 border border-red-100">
+          <h3 className="font-bold text-red-600 mb-1">Danger Zone</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Permanently delete your account and all associated data. This cannot be undone.
+          </p>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="px-4 py-2 rounded-xl border-2 border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors">
+            Delete My Account
+          </button>
+        </div>
       </main>
       <Footer />
+
+      {showDeleteModal && (
+        <DeleteAccountModal
+          role={user?.role}
+          onConfirm={handleDeleteAccount}
+          onClose={() => setShowDeleteModal(false)}
+        />
+      )}
     </div>
   )
 }
